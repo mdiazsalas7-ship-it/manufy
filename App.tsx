@@ -42,17 +42,31 @@ const TUNNEL_HEADERS = { 'Cloudflare-Skip-Browser-Warning': 'true' };
 const LOGO_URL = 'https://i.postimg.cc/05wxzk5G/unnamed.jpg';
 const BACKGROUND_IMAGE = 'https://i.postimg.cc/P5k7rD2R/unnamed.jpg';
 
-// --- DATOS ESTÁTICOS ---
+// --- FOTOS DE INICIO (Home) - REPARADAS ---
 const STATIC_TRENDS: Playlist[] = [
-  { id: 'st-1', name: 'Global Top 50', description: 'Lo más sonado', imageUrl: 'https://picsum.photos/seed/global/600', type: 'playlist' },
-  { id: 'st-2', name: 'Reggaetón Viejito', description: 'Clásicos', imageUrl: 'https://picsum.photos/seed/reggaeton/600', type: 'playlist' },
-  { id: 'st-3', name: 'Viral TikTok', description: 'Tendencias', imageUrl: 'https://picsum.photos/seed/tiktok/600', type: 'playlist' },
-  { id: 'st-4', name: 'Gym Motivation', description: 'Energía pura', imageUrl: 'https://picsum.photos/seed/gym/600', type: 'playlist' },
+  { id: 'st-1', name: 'Global Top 50', description: 'Lo más sonado', imageUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&q=80', type: 'playlist' },
+  { id: 'st-2', name: 'Reggaetón Viejito', description: 'Clásicos', imageUrl: 'https://images.unsplash.com/photo-1605810230434-7631ac76ec81?w=800&q=80', type: 'playlist' },
+  // REPARADO: Viral TikTok (Luces neón púrpuras estilo "Euphoria/TikTok")
+  { id: 'st-3', name: 'Viral TikTok', description: 'Tendencias', imageUrl: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=800&q=80', type: 'playlist' },
+  { id: 'st-4', name: 'Gym Motivation', description: 'Energía pura', imageUrl: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80', type: 'playlist' },
 ];
 
+// --- FOTOS DE GÉNEROS (Buscar) - REPARADAS ---
+const GENRES_DATA = [
+  // REPARADO: Urbano Latino (Micrófono con luz roja intensa)
+  { name: 'Urbano Latino', color: 'bg-purple-600', imageUrl: 'https://images.unsplash.com/photo-1598387993441-a364f854c3e1?w=800&q=80' },
+  { name: 'Pop Internacional', color: 'bg-pink-600', imageUrl: 'https://images.unsplash.com/photo-1496337589254-7e19d01cec44?w=800&q=80' },
+  { name: 'Rock & Metal', color: 'bg-red-600', imageUrl: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=800&q=80' },
+  { name: 'Salsa & Tropical', color: 'bg-orange-600', imageUrl: 'https://images.unsplash.com/photo-1545128485-c400e7702796?w=800&q=80' },
+  { name: 'Hip-Hop / Rap', color: 'bg-zinc-600', imageUrl: 'https://images.unsplash.com/photo-1508973379184-7517410fb0bc?w=800&q=80' },
+  { name: 'Electrónica', color: 'bg-blue-600', imageUrl: 'https://images.unsplash.com/photo-1574169208507-84376144848b?w=800&q=80' },
+];
+
+// --- NOTICIAS BASE ---
 const STATIC_NEWS = [
-  { headline: "Conectado a GPT-4o", summary: "Sistema estable.", content: "Usando el modelo más potente disponible en OpenRouter.", category: "Sistema", emoji: "🧠" },
-  { headline: "Bad Bunny", summary: "Rompe récords globales.", content: "El artista sigue dominando las listas con su último álbum.", category: "Música", emoji: "🐰" }
+  { headline: "Bad Bunny rompe récords", summary: "Su gira se convierte en la más taquillera de la historia.", content: "El conejo malo sigue haciendo historia con números impresionantes en ventas.", category: "Urbano", emoji: "🐰" },
+  { headline: "Feid anuncia nuevo álbum", summary: "El Ferxxo sorprende con fecha de lanzamiento.", content: "Se espera que incluya colaboraciones con grandes del género.", category: "Lanzamiento", emoji: "💚" },
+  { headline: "Karol G en el Bernabéu", summary: "Cuatro fechas sold-out en Madrid.", content: "La Bichota demuestra su poder global llenando estadios en Europa.", category: "Concierto", emoji: "🌸" },
 ];
 
 const POPULAR_ARTISTS = [
@@ -99,7 +113,7 @@ const getCachedData = (key: string) => {
 const setCachedData = (key: string, data: any) => { localStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() })); };
 const urlCache = new Map<string, string>();
 
-async function resilientFetch(url: string, options: RequestInit = {}, timeout = 15000) { // Timeout reducido a 15s para no colgarse
+async function resilientFetch(url: string, options: RequestInit = {}, timeout = 15000) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
   const headers: Record<string, string> = { ...TUNNEL_HEADERS, ...(options.headers as Record<string, string> || {}) };
@@ -136,7 +150,7 @@ const MusicEqualizer = () => (
   </div>
 );
 
-// --- VISTA DETALLE PLAYLIST (SIN PRE-CARGA AGRESIVA) ---
+// --- VISTA DETALLE PLAYLIST ---
 const PlaylistDetail: React.FC<{ 
   playlist: Playlist; 
   onBack: () => void; 
@@ -151,7 +165,7 @@ const PlaylistDetail: React.FC<{
   useEffect(() => {
     const fetchSongs = async () => {
       setLoading(true);
-      const cacheKey = `playlist_meta_v6_${playlist.name}`;
+      const cacheKey = `playlist_meta_v10_${playlist.name}`; // V10: Nueva versión de caché
       const cached = getCachedData(cacheKey);
       
       let metaSongs: any[] = [];
@@ -180,7 +194,6 @@ const PlaylistDetail: React.FC<{
         setCachedData(cacheKey, displaySongs);
         setLoading(false);
       }
-      // NOTA: Eliminada la pre-carga automática para evitar congestión de red.
     };
     fetchSongs();
   }, [playlist.name]);
@@ -255,32 +268,19 @@ export default function App() {
   const handleCloseToast = useCallback(() => { setToast(null); }, []);
 
   const resolveSongAudio = async (song: Song): Promise<string | undefined> => {
-    // 1. Revisar caché
     if (urlCache.has(song.id)) return urlCache.get(song.id);
     if (song.audioUrl) return song.audioUrl; 
-    
-    // 2. Revisar Offline
     const offlineBlob = await getAudioBlob(song.id);
     if (offlineBlob) return URL.createObjectURL(offlineBlob);
-
-    // 3. Buscar en Backend (Aquí es donde se traba si hay cola)
     try {
-      // Usamos encodeURIComponent para asegurar que el backend reciba bien el string
       const query = encodeURIComponent(`${song.title} ${song.artist} audio`);
       const res = await resilientFetch(`${BACKEND_URL}/buscar?q=${query}`);
-      
       if (res.ok) {
         const data = await res.json();
         if (data && data.length > 0) {
           const item = data[0];
-          const finalUrl = item.audioUrl || item.audio ? 
-            ((item.audioUrl || item.audio).startsWith('http') ? (item.audioUrl || item.audio) : `${BACKEND_URL}/${(item.audioUrl || item.audio).replace(/^\//, '')}`) 
-            : undefined;
-          
-          if (finalUrl) { 
-            urlCache.set(song.id, finalUrl); 
-            return finalUrl; 
-          }
+          const finalUrl = item.audioUrl || item.audio ? ((item.audioUrl || item.audio).startsWith('http') ? (item.audioUrl || item.audio) : `${BACKEND_URL}/${(item.audioUrl || item.audio).replace(/^\//, '')}`) : undefined;
+          if (finalUrl) { urlCache.set(song.id, finalUrl); return finalUrl; }
         }
       }
     } catch (e) { console.error("Error buscando audio:", e); }
@@ -296,24 +296,18 @@ export default function App() {
   };
 
   const onSelectSong = async (song: Song, contextQueue?: Song[]) => {
-    // UI Feedback Inmediato
     setCurrentSong(song);
     setIsPlaying(false);
     setSongLoading(true);
-    
     if (contextQueue) setQueue(contextQueue);
     const activeQueue = contextQueue || queue;
-
-    // Carga de audio
     const url = await resolveSongAudio(song);
-    
     if (url) {
       setPlaybackUrl(url);
       setCurrentSong(prev => ({ ...prev, audioUrl: url }));
       setIsPlaying(true);
       setHistory(prev => [song, ...prev.filter(s => s.id !== song.id)].slice(0, 15));
       setSongLoading(false);
-      // Solo precargamos la siguiente cuando la actual YA cargó
       preloadNextSong(song.id, activeQueue);
     } else {
       showToast("No se pudo cargar la canción", 'error');
@@ -346,23 +340,38 @@ export default function App() {
   const loadBackgroundData = async () => {
     if (!ENV_KEY) return;
     
-    const cachedTrends = getCachedData('trends_home_v5');
+    // CACHÉ V10: Trends (Fotos estáticas de Unsplash para evitar carga de IA)
+    const cachedTrends = getCachedData('trends_home_v10');
     if (!cachedTrends) {
-      const aiResponse = await callAI([{ role: "user", content: "6 categorias musicales para streaming. JSON array con: id, name, description." }]);
-      if (aiResponse) {
-        const trends = cleanAiResponse(aiResponse).map((t: any, i: number) => ({ ...t, imageUrl: `https://picsum.photos/seed/trend-${i}/600`, type: 'playlist' }));
-        if (trends.length) { setAiPlaylists(trends); setCachedData('trends_home_v5', trends); }
-      }
+        // En V10, usamos los datos estáticos para las imágenes, pero podríamos pedir nombres a la IA
+        // Para estabilidad, usaremos los definidos arriba
+        setAiPlaylists(STATIC_TRENDS); 
+        setCachedData('trends_home_v10', STATIC_TRENDS);
+    } else {
+        setAiPlaylists(cachedTrends);
     }
     
-    const cachedNews = getCachedData('music_news_v5');
+    // CACHÉ V10: Noticias
+    const cachedNews = getCachedData('music_news_v10');
     if (!cachedNews) {
-      const newsPrompt = `Actúa como un periodista musical experto. Genera 5 noticias virales y RECIENTES sobre el mundo de la música urbana y pop. Responde SOLO un JSON array válido con objetos: headline, summary, content, category, emoji.`;
+      const newsPrompt = `Actúa como un periodista musical experto de MTV. Genera 5 noticias virales y RECIENTES sobre el mundo de la música urbana y pop (Ej: Bad Bunny, Karol G, Feid, Taylor Swift).
+      Responde SOLO un JSON array válido con objetos:
+      - headline: Título corto e impactante (max 6 palabras).
+      - summary: Subtítulo atractivo.
+      - content: Detalle de la noticia (2 líneas).
+      - category: Una palabra (Ej: "Gira", "Viral", "Hit").
+      - emoji: Un emoji relacionado.`;
+
       const aiResponse = await callAI([{ role: "user", content: newsPrompt }]);
       if (aiResponse) {
         const news = cleanAiResponse(aiResponse);
-        if (news.length) { setMusicNews(news); setCachedData('music_news_v5', news); }
+        if (news.length > 0) {
+           setMusicNews(news); 
+           setCachedData('music_news_v10', news); 
+        }
       }
+    } else {
+      setMusicNews(cachedNews);
     }
   };
 
@@ -401,7 +410,7 @@ export default function App() {
   const toggleSpeakNews = () => {
     if (isSpeaking) { window.speechSynthesis.cancel(); setIsSpeaking(false); } else {
       if (musicNews.length === 0) return;
-      const textToRead = "Noticias. " + musicNews.map(n => `${n.headline}. ${n.summary}`).join(". ");
+      const textToRead = "Noticias Manufy. " + musicNews.map(n => `${n.headline}. ${n.summary}`).join(". ");
       const utterance = new SpeechSynthesisUtterance(textToRead);
       utterance.lang = 'es-ES';
       utterance.rate = 1.1;
@@ -571,7 +580,7 @@ export default function App() {
       )}
     </div>
   );
-}
+};
 
 const SearchView: React.FC<{ onSelectSong: (s: Song, context?: Song[]) => void; currentSong: Song; isPlaying: boolean; showToast: (msg: string, type: 'success' | 'error' | 'info') => void; onSelectGenre: (p: Playlist) => void; }> = ({ onSelectSong, currentSong, isPlaying, showToast, onSelectGenre }) => {
   const [query, setQuery] = useState('');
@@ -626,7 +635,7 @@ const SearchView: React.FC<{ onSelectSong: (s: Song, context?: Song[]) => void; 
               </div>
             ))}
           </div>
-        ) : <div className="grid grid-cols-2 gap-4">{GENRES.map(g => <div key={g.name} onClick={() => onSelectGenre({ id: g.name, name: g.name, imageUrl: g.imageUrl, type: 'playlist' })} className={`${g.color} aspect-video rounded-3xl p-4 relative overflow-hidden group cursor-pointer active:scale-95 transition-all shadow-xl`}><span className="text-sm font-black relative z-10">{g.name}</span><img src={g.imageUrl} className="absolute w-20 h-20 -bottom-2 -right-2 opacity-50 rotate-12 group-hover:scale-125 transition-transform" /></div>)}</div>
+        ) : <div className="grid grid-cols-2 gap-4">{GENRES_DATA.map(g => <div key={g.name} onClick={() => onSelectGenre({ id: g.name, name: g.name, imageUrl: g.imageUrl, type: 'playlist' })} className={`${g.color} aspect-video rounded-3xl p-4 relative overflow-hidden group cursor-pointer active:scale-95 transition-all shadow-xl`}><span className="text-sm font-black relative z-10">{g.name}</span><img src={g.imageUrl} className="absolute w-full h-full object-cover top-0 left-0 opacity-50 transition-transform group-hover:scale-110" /></div>)}</div>
       }
     </div>
   );

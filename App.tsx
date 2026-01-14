@@ -3,7 +3,6 @@ import {
   Home as HomeIcon, 
   Search as SearchIcon, 
   Library as LibraryIcon, 
-  Sparkles, 
   Play, 
   Pause, 
   SkipBack, 
@@ -25,12 +24,14 @@ import {
   ArrowLeft,
   Music,
   Globe,
-  Newspaper,
   ExternalLink,
   Mic,
   Share2,
   TrendingUp,
-  X 
+  X,
+  Plus,       // Nuevo icono
+  ListPlus,   // Nuevo icono
+  Trash2      // Nuevo icono
 } from 'lucide-react';
 import { View, Song, Playlist } from './types';
 import { GENRES, INITIAL_SONG } from './constants';
@@ -42,31 +43,32 @@ const TUNNEL_HEADERS = { 'Cloudflare-Skip-Browser-Warning': 'true' };
 const LOGO_URL = 'https://i.postimg.cc/05wxzk5G/unnamed.jpg';
 const BACKGROUND_IMAGE = 'https://i.postimg.cc/P5k7rD2R/unnamed.jpg';
 
-// --- FOTOS DE INICIO (Home) - REPARADAS ---
+// --- PORTADAS DE RESPALDO ---
+const ALBUM_COVERS = [
+  'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=300&q=80',
+  'https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=300&q=80',
+  'https://images.unsplash.com/photo-1621621667797-e06afc210af0?w=300&q=80',
+  'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=300&q=80',
+  'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300&q=80',
+  'https://images.unsplash.com/photo-1514525253440-b393452e8d26?w=300&q=80',
+];
+
+// --- FOTOS DE INICIO (Home) ---
 const STATIC_TRENDS: Playlist[] = [
   { id: 'st-1', name: 'Global Top 50', description: 'Lo más sonado', imageUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&q=80', type: 'playlist' },
   { id: 'st-2', name: 'Reggaetón Viejito', description: 'Clásicos', imageUrl: 'https://images.unsplash.com/photo-1605810230434-7631ac76ec81?w=800&q=80', type: 'playlist' },
-  // REPARADO: Viral TikTok (Luces neón púrpuras estilo "Euphoria/TikTok")
   { id: 'st-3', name: 'Viral TikTok', description: 'Tendencias', imageUrl: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=800&q=80', type: 'playlist' },
   { id: 'st-4', name: 'Gym Motivation', description: 'Energía pura', imageUrl: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80', type: 'playlist' },
 ];
 
-// --- FOTOS DE GÉNEROS (Buscar) - REPARADAS ---
+// --- FOTOS DE GÉNEROS (Buscar) ---
 const GENRES_DATA = [
-  // REPARADO: Urbano Latino (Micrófono con luz roja intensa)
   { name: 'Urbano Latino', color: 'bg-purple-600', imageUrl: 'https://images.unsplash.com/photo-1598387993441-a364f854c3e1?w=800&q=80' },
   { name: 'Pop Internacional', color: 'bg-pink-600', imageUrl: 'https://images.unsplash.com/photo-1496337589254-7e19d01cec44?w=800&q=80' },
   { name: 'Rock & Metal', color: 'bg-red-600', imageUrl: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=800&q=80' },
   { name: 'Salsa & Tropical', color: 'bg-orange-600', imageUrl: 'https://images.unsplash.com/photo-1545128485-c400e7702796?w=800&q=80' },
   { name: 'Hip-Hop / Rap', color: 'bg-zinc-600', imageUrl: 'https://images.unsplash.com/photo-1508973379184-7517410fb0bc?w=800&q=80' },
   { name: 'Electrónica', color: 'bg-blue-600', imageUrl: 'https://images.unsplash.com/photo-1574169208507-84376144848b?w=800&q=80' },
-];
-
-// --- NOTICIAS BASE ---
-const STATIC_NEWS = [
-  { headline: "Bad Bunny rompe récords", summary: "Su gira se convierte en la más taquillera de la historia.", content: "El conejo malo sigue haciendo historia con números impresionantes en ventas.", category: "Urbano", emoji: "🐰" },
-  { headline: "Feid anuncia nuevo álbum", summary: "El Ferxxo sorprende con fecha de lanzamiento.", content: "Se espera que incluya colaboraciones con grandes del género.", category: "Lanzamiento", emoji: "💚" },
-  { headline: "Karol G en el Bernabéu", summary: "Cuatro fechas sold-out en Madrid.", content: "La Bichota demuestra su poder global llenando estadios en Europa.", category: "Concierto", emoji: "🌸" },
 ];
 
 const POPULAR_ARTISTS = [
@@ -78,28 +80,34 @@ const POPULAR_ARTISTS = [
 const ENV_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
 const AI_MODEL = "openai/gpt-4o-mini";
 
-// --- FUNCIÓN MANUAL DIRECTA ---
+// --- FUNCIÓN MANUAL DIRECTA IA ---
 async function callAI(messages: any[]) {
   if (!ENV_KEY) return null;
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${ENV_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://stackblitz.com", 
-        "X-Title": "Manufy"
-      },
-      body: JSON.stringify({
-        model: AI_MODEL,
-        messages: messages,
-        temperature: 0.7
-      })
+      headers: { "Authorization": `Bearer ${ENV_KEY}`, "Content-Type": "application/json", "HTTP-Referer": "https://stackblitz.com", "X-Title": "Manufy" },
+      body: JSON.stringify({ model: AI_MODEL, messages: messages, temperature: 0.7 })
     });
     if (!response.ok) return null;
     const data = await response.json();
     return data.choices?.[0]?.message?.content || "[]";
   } catch (e) { return null; }
+}
+
+// --- BUSCADOR DE PORTADAS REALES ---
+async function fetchAlbumCover(songTitle: string, artistName: string): Promise<string> {
+  try {
+    const query = encodeURIComponent(`${songTitle} ${artistName}`);
+    const res = await fetch(`https://itunes.apple.com/search?term=${query}&media=music&entity=song&limit=1`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.results && data.results.length > 0) {
+        return data.results[0].artworkUrl100.replace('100x100bb', '600x600bb');
+      }
+    }
+  } catch (e) {}
+  return '';
 }
 
 const cleanAiResponse = (text: string) => { try { return JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim()); } catch (e) { return []; } };
@@ -113,7 +121,7 @@ const getCachedData = (key: string) => {
 const setCachedData = (key: string, data: any) => { localStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() })); };
 const urlCache = new Map<string, string>();
 
-async function resilientFetch(url: string, options: RequestInit = {}, timeout = 15000) {
+async function resilientFetch(url: string, options: RequestInit = {}, timeout = 20000) { 
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
   const headers: Record<string, string> = { ...TUNNEL_HEADERS, ...(options.headers as Record<string, string> || {}) };
@@ -125,15 +133,15 @@ async function resilientFetch(url: string, options: RequestInit = {}, timeout = 
 }
 
 const FALLBACK_SONGS: Record<string, {title: string, artist: string}[]> = {
-  'Global Top 50': [{ title: 'Monaco', artist: 'Bad Bunny' }, { title: 'Greedy', artist: 'Tate McRae' }, { title: 'Paint The Town Red', artist: 'Doja Cat' }, { title: 'LALA', artist: 'Myke Towers' }],
-  'Reggaetón Viejito': [{ title: 'Gasolina', artist: 'Daddy Yankee' }, { title: 'Dile', artist: 'Don Omar' }, { title: 'Rakata', artist: 'Wisin y Yandel' }],
-  'Viral TikTok': [{ title: 'Beautiful Things', artist: 'Benson Boone' }, { title: 'Gata Only', artist: 'FloyyMenor' }]
+  'Global Top 50': [{ title: 'Monaco', artist: 'Bad Bunny' }, { title: 'Greedy', artist: 'Tate McRae' }],
+  'Reggaetón Viejito': [{ title: 'Gasolina', artist: 'Daddy Yankee' }, { title: 'Dile', artist: 'Don Omar' }],
+  'Viral TikTok': [{ title: 'Beautiful Things', artist: 'Benson Boone' }]
 };
 
 const Toast: React.FC<{ message: string; type: 'success' | 'error' | 'info'; onClose: () => void }> = ({ message, type, onClose }) => {
   useEffect(() => { const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); }, [onClose]);
   return (
-    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[150] px-6 py-3 rounded-full bg-zinc-900/95 backdrop-blur-xl border border-white/10 shadow-2xl flex items-center gap-3 animate-in slide-in-from-top-2 fade-in duration-300 max-w-[90vw]">
+    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 rounded-full bg-zinc-900/95 backdrop-blur-xl border border-white/10 shadow-2xl flex items-center gap-3 animate-in slide-in-from-top-2 fade-in duration-300 max-w-[90vw]">
       {type === 'success' && <CheckCircle2 size={18} className="text-emerald-500 flex-shrink-0" />}
       {type === 'error' && <XCircle size={18} className="text-rose-500 flex-shrink-0" />}
       {type === 'info' && <Loader2 size={18} className="text-purple-500 animate-spin flex-shrink-0" />}
@@ -150,7 +158,7 @@ const MusicEqualizer = () => (
   </div>
 );
 
-// --- VISTA DETALLE PLAYLIST ---
+// --- VISTA DETALLE PLAYLIST (SOPORTA USUARIO Y AI) ---
 const PlaylistDetail: React.FC<{ 
   playlist: Playlist; 
   onBack: () => void; 
@@ -158,45 +166,56 @@ const PlaylistDetail: React.FC<{
   currentSong: Song;
   isPlaying: boolean;
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
-}> = ({ playlist, onBack, onSelectSong, currentSong, isPlaying, showToast }) => {
+  userSongs?: Song[]; // Prop opcional para listas del usuario
+  onDelete?: () => void; // Prop para borrar lista
+}> = ({ playlist, onBack, onSelectSong, currentSong, isPlaying, showToast, userSongs, onDelete }) => {
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // 1. Si es lista de usuario, usamos las canciones pasadas por prop
+    if (userSongs) {
+      setSongs(userSongs);
+      setLoading(false);
+      return;
+    }
+
+    // 2. Si es lista de IA, hacemos el fetch normal
     const fetchSongs = async () => {
       setLoading(true);
-      const cacheKey = `playlist_meta_v10_${playlist.name}`; // V10: Nueva versión de caché
+      const cacheKey = `playlist_meta_v16_${playlist.name}`;
       const cached = getCachedData(cacheKey);
       
       let metaSongs: any[] = [];
-      
-      if (cached) {
-        metaSongs = cached;
-        setSongs(cached);
-        setLoading(false);
-      } else {
-        metaSongs = FALLBACK_SONGS[playlist.name] || FALLBACK_SONGS['Global Top 50'] || [];
-        if (ENV_KEY) {
-          const aiResponse = await callAI([
-            { role: "system", content: "Eres un DJ experto. Responde SOLO un JSON array válido." },
-            { role: "user", content: `Genera 10 canciones TOP HITS para la playlist: "${playlist.name}". Formato JSON: title, artist.` }
-          ]);
-          if (aiResponse) {
-            const aiData = cleanAiResponse(aiResponse);
-            if (aiData.length > 0) metaSongs = aiData;
-          }
+      if (cached) { setSongs(cached); setLoading(false); return; }
+
+      metaSongs = FALLBACK_SONGS[playlist.name] || FALLBACK_SONGS['Global Top 50'] || [];
+      if (ENV_KEY) {
+        const aiResponse = await callAI([
+          { role: "system", content: "Eres un DJ experto. Responde SOLO un JSON array válido." },
+          { role: "user", content: `Genera 10 canciones TOP HITS REALES para la playlist: "${playlist.name}". Formato JSON: title, artist.` }
+        ]);
+        if (aiResponse) {
+          const aiData = cleanAiResponse(aiResponse);
+          if (aiData.length > 0) metaSongs = aiData;
         }
-        const displaySongs: Song[] = metaSongs.map((s, i) => ({
-          id: `pl-${playlist.id}-${i}-${s.title}`, title: s.title, artist: s.artist,
-          coverUrl: `https://picsum.photos/seed/${s.title}/300`, audioUrl: undefined, duration: 0
-        }));
-        setSongs(displaySongs);
-        setCachedData(cacheKey, displaySongs);
-        setLoading(false);
       }
+
+      const displaySongs = await Promise.all(metaSongs.map(async (s, i) => {
+        let cover = '';
+        if (s.title && s.artist) cover = await fetchAlbumCover(s.title, s.artist);
+        if (!cover) cover = ALBUM_COVERS[i % ALBUM_COVERS.length];
+        return {
+          id: `pl-${playlist.id}-${i}-${s.title}`, title: s.title, artist: s.artist, coverUrl: cover, audioUrl: undefined, duration: 0
+        };
+      }));
+
+      setSongs(displaySongs);
+      setCachedData(cacheKey, displaySongs);
+      setLoading(false);
     };
     fetchSongs();
-  }, [playlist.name]);
+  }, [playlist.name, userSongs]);
 
   return (
     <div className="absolute inset-0 bg-black/90 z-[70] flex flex-col animate-in slide-in-from-right duration-500 overflow-y-auto hide-scrollbar">
@@ -204,10 +223,12 @@ const PlaylistDetail: React.FC<{
         <img src={playlist.imageUrl} className="w-full h-full object-cover blur-sm opacity-50" />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
         <button onClick={onBack} className="absolute top-12 left-6 w-10 h-10 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center border border-white/10"><ArrowLeft size={24} /></button>
-        <div className="absolute top-12 right-6"><img src={LOGO_URL} className="w-10 h-10 rounded-full border border-white/20 shadow-lg" alt="Manufy Logo" /></div>
+        {onDelete && (
+          <button onClick={onDelete} className="absolute top-12 right-6 w-10 h-10 bg-red-500/20 backdrop-blur-md rounded-full flex items-center justify-center border border-red-500/50 text-red-500"><Trash2 size={20} /></button>
+        )}
         <div className="absolute bottom-6 left-6 right-6">
           <h1 className="text-4xl font-black tracking-tighter mb-2">{playlist.name}</h1>
-          <p className="text-zinc-400 text-sm font-bold uppercase tracking-widest">{ENV_KEY ? "Powered by AI" : "Modo Offline"}</p>
+          <p className="text-zinc-400 text-sm font-bold uppercase tracking-widest">{userSongs ? "Mi Playlist" : "Powered by AI"}</p>
         </div>
       </div>
       <div className="p-6 flex-1 bg-black/80 backdrop-blur-xl rounded-t-[40px] -mt-10 relative z-10 border-t border-white/5">
@@ -217,10 +238,11 @@ const PlaylistDetail: React.FC<{
         </div>
         {loading ? <div className="space-y-4">{[...Array(6)].map((_, i) => <div key={i} className="flex gap-4 items-center animate-pulse"><div className="w-12 h-12 bg-zinc-900 rounded-lg" /><div className="flex-1 space-y-2"><div className="h-4 bg-zinc-900 rounded w-3/4" /><div className="h-3 bg-zinc-900 rounded w-1/2" /></div></div>)}</div> : (
           <div className="flex flex-col gap-4 pb-32">
-            {songs.map((song, i) => (
+            {songs.length === 0 ? <div className="text-center text-zinc-500 py-10 opacity-50">Lista vacía.<br/>Agrega canciones desde el reproductor.</div> : 
+            songs.map((song, i) => (
               <div key={song.id} onClick={() => onSelectSong(song, songs)} className={`flex items-center gap-4 group cursor-pointer p-2 rounded-xl transition-all ${currentSong.id === song.id ? 'bg-purple-600/10' : 'hover:bg-white/5'}`}>
                 <span className="text-zinc-700 font-black text-xs w-4">{i + 1}</span>
-                <img src={song.coverUrl} className="w-12 h-12 rounded-lg object-cover shadow-md" />
+                <img src={song.coverUrl || ALBUM_COVERS[0]} className="w-12 h-12 rounded-lg object-cover shadow-md" />
                 <div className="flex-1 overflow-hidden">
                   <h3 className={`text-sm font-bold truncate ${currentSong.id === song.id ? 'text-purple-400' : 'text-white'}`}>{song.title}</h3>
                   <p className="text-[10px] text-zinc-500 font-bold uppercase truncate">{song.artist}</p>
@@ -249,15 +271,18 @@ export default function App() {
   const [queue, setQueue] = useState<Song[]>([]);
   const [songLoading, setSongLoading] = useState(false);
 
+  // --- PLAYLISTS USUARIO ---
+  const [userPlaylists, setUserPlaylists] = useState<Playlist[]>([]);
+  const [playlistSongs, setPlaylistSongs] = useState<Record<string, Song[]>>({});
+  const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
+
   const [aiPlaylists, setAiPlaylists] = useState<Playlist[]>(STATIC_TRENDS);
-  const [musicNews, setMusicNews] = useState<any[]>(STATIC_NEWS);
-  
   const [playbackUrl, setPlaybackUrl] = useState<string | undefined>(undefined);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [librarySubView, setLibrarySubView] = useState<'main' | 'likes'>('main');
+  const [librarySubView, setLibrarySubView] = useState<'main' | 'likes' | 'playlist'>('main');
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [selectedNewsItem, setSelectedNewsItem] = useState<any | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -267,11 +292,55 @@ export default function App() {
 
   const handleCloseToast = useCallback(() => { setToast(null); }, []);
 
+  // --- LOGICA PLAYLISTS ---
+  const createPlaylist = () => {
+    if (!newPlaylistName.trim()) return;
+    const newPl: Playlist = {
+      id: `user-pl-${Date.now()}`,
+      name: newPlaylistName,
+      description: 'Mi lista',
+      imageUrl: ALBUM_COVERS[Math.floor(Math.random() * ALBUM_COVERS.length)],
+      type: 'playlist'
+    };
+    setUserPlaylists(prev => [...prev, newPl]);
+    setPlaylistSongs(prev => ({ ...prev, [newPl.id]: [] }));
+    setNewPlaylistName('');
+    setShowCreatePlaylist(false);
+    showToast('Playlist creada', 'success');
+  };
+
+  const deletePlaylist = (id: string) => {
+    setUserPlaylists(prev => prev.filter(p => p.id !== id));
+    const newSongs = { ...playlistSongs };
+    delete newSongs[id];
+    setPlaylistSongs(newSongs);
+    setSelectedPlaylist(null);
+    setLibrarySubView('main');
+    showToast('Playlist eliminada', 'info');
+  };
+
+  const addToPlaylist = (playlistId: string) => {
+    setPlaylistSongs(prev => {
+      const current = prev[playlistId] || [];
+      if (current.some(s => s.id === currentSong.id)) {
+        showToast('Ya está en la lista', 'info');
+        return prev;
+      }
+      return { ...prev, [playlistId]: [...current, currentSong] };
+    });
+    setShowAddToPlaylist(false);
+    showToast('Agregada a playlist', 'success');
+  };
+
   const resolveSongAudio = async (song: Song): Promise<string | undefined> => {
+    try {
+      const offlineBlob = await getAudioBlob(song.id);
+      if (offlineBlob) return URL.createObjectURL(offlineBlob);
+    } catch (e) {}
+
     if (urlCache.has(song.id)) return urlCache.get(song.id);
-    if (song.audioUrl) return song.audioUrl; 
-    const offlineBlob = await getAudioBlob(song.id);
-    if (offlineBlob) return URL.createObjectURL(offlineBlob);
+    if (song.audioUrl && song.audioUrl.startsWith('http')) return song.audioUrl; 
+
     try {
       const query = encodeURIComponent(`${song.title} ${song.artist} audio`);
       const res = await resilientFetch(`${BACKEND_URL}/buscar?q=${query}`);
@@ -283,7 +352,7 @@ export default function App() {
           if (finalUrl) { urlCache.set(song.id, finalUrl); return finalUrl; }
         }
       }
-    } catch (e) { console.error("Error buscando audio:", e); }
+    } catch (e) {}
     return undefined;
   };
 
@@ -310,7 +379,7 @@ export default function App() {
       setSongLoading(false);
       preloadNextSong(song.id, activeQueue);
     } else {
-      showToast("No se pudo cargar la canción", 'error');
+      showToast("Error de conexión.", 'error');
       setSongLoading(false);
     }
   };
@@ -339,50 +408,31 @@ export default function App() {
 
   const loadBackgroundData = async () => {
     if (!ENV_KEY) return;
-    
-    // CACHÉ V10: Trends (Fotos estáticas de Unsplash para evitar carga de IA)
-    const cachedTrends = getCachedData('trends_home_v10');
+    const cachedTrends = getCachedData('trends_home_v12');
     if (!cachedTrends) {
-        // En V10, usamos los datos estáticos para las imágenes, pero podríamos pedir nombres a la IA
-        // Para estabilidad, usaremos los definidos arriba
         setAiPlaylists(STATIC_TRENDS); 
-        setCachedData('trends_home_v10', STATIC_TRENDS);
+        setCachedData('trends_home_v12', STATIC_TRENDS);
     } else {
         setAiPlaylists(cachedTrends);
-    }
-    
-    // CACHÉ V10: Noticias
-    const cachedNews = getCachedData('music_news_v10');
-    if (!cachedNews) {
-      const newsPrompt = `Actúa como un periodista musical experto de MTV. Genera 5 noticias virales y RECIENTES sobre el mundo de la música urbana y pop (Ej: Bad Bunny, Karol G, Feid, Taylor Swift).
-      Responde SOLO un JSON array válido con objetos:
-      - headline: Título corto e impactante (max 6 palabras).
-      - summary: Subtítulo atractivo.
-      - content: Detalle de la noticia (2 líneas).
-      - category: Una palabra (Ej: "Gira", "Viral", "Hit").
-      - emoji: Un emoji relacionado.`;
-
-      const aiResponse = await callAI([{ role: "user", content: newsPrompt }]);
-      if (aiResponse) {
-        const news = cleanAiResponse(aiResponse);
-        if (news.length > 0) {
-           setMusicNews(news); 
-           setCachedData('music_news_v10', news); 
-        }
-      }
-    } else {
-      setMusicNews(cachedNews);
     }
   };
 
   useEffect(() => {
     const savedFavs = localStorage.getItem('manufy_favorites');
     if (savedFavs) setFavorites(JSON.parse(savedFavs));
+    
+    const savedPlaylists = localStorage.getItem('manufy_user_playlists');
+    if (savedPlaylists) setUserPlaylists(JSON.parse(savedPlaylists));
+    
+    const savedSongs = localStorage.getItem('manufy_playlist_songs');
+    if (savedSongs) setPlaylistSongs(JSON.parse(savedSongs));
+
     loadBackgroundData();
-    return () => window.speechSynthesis.cancel();
   }, []);
 
   useEffect(() => { localStorage.setItem('manufy_favorites', JSON.stringify(favorites)); }, [favorites]);
+  useEffect(() => { localStorage.setItem('manufy_user_playlists', JSON.stringify(userPlaylists)); }, [userPlaylists]);
+  useEffect(() => { localStorage.setItem('manufy_playlist_songs', JSON.stringify(playlistSongs)); }, [playlistSongs]);
 
   const togglePlay = () => { if (currentSong.id !== 'current') setIsPlaying(!isPlaying); };
   
@@ -400,23 +450,19 @@ export default function App() {
       showToast("Eliminada de favoritos", 'success');
     } else {
       setFavorites(prev => [...prev, song]);
+      showToast("Descargando...", "info");
       resolveSongAudio(song).then(async (url) => {
-        if (url) { try { const res = await fetch(url); if(res.ok) await saveAudioBlob(song.id, await res.blob()); } catch(e) {} }
+        if (url) {
+          try {
+            const response = await fetch(url);
+            if (response.ok) {
+              const blob = await response.blob();
+              await saveAudioBlob(song.id, blob);
+              showToast("¡Descargada! 💾", "success");
+            } else { showToast("Error de red", "error"); }
+          } catch (e) { showToast("Guardada solo lista", "info"); }
+        } else { showToast("Error audio", "error"); }
       });
-      showToast("Agregada a favoritos", 'success');
-    }
-  };
-
-  const toggleSpeakNews = () => {
-    if (isSpeaking) { window.speechSynthesis.cancel(); setIsSpeaking(false); } else {
-      if (musicNews.length === 0) return;
-      const textToRead = "Noticias Manufy. " + musicNews.map(n => `${n.headline}. ${n.summary}`).join(". ");
-      const utterance = new SpeechSynthesisUtterance(textToRead);
-      utterance.lang = 'es-ES';
-      utterance.rate = 1.1;
-      utterance.onend = () => setIsSpeaking(false);
-      window.speechSynthesis.speak(utterance);
-      setIsSpeaking(true);
     }
   };
 
@@ -428,16 +474,61 @@ export default function App() {
 
       <audio ref={audioRef} src={playbackUrl} onTimeUpdate={() => audioRef.current && setCurrentTime(audioRef.current.currentTime)} onLoadedMetadata={() => audioRef.current && setCurrentSong(s => ({ ...s, duration: audioRef.current?.duration || 0 }))} onEnded={handleSongEnd} />
 
-      {selectedPlaylist && <PlaylistDetail playlist={selectedPlaylist} onBack={() => setSelectedPlaylist(null)} onSelectSong={onSelectSong} currentSong={currentSong} isPlaying={isPlaying} showToast={showToast} />}
+      {selectedPlaylist && (
+        <PlaylistDetail 
+          playlist={selectedPlaylist} 
+          onBack={() => { setSelectedPlaylist(null); setLibrarySubView('main'); }} 
+          onSelectSong={onSelectSong} 
+          currentSong={currentSong} 
+          isPlaying={isPlaying} 
+          showToast={showToast}
+          userSongs={selectedPlaylist.id.startsWith('user-pl') ? playlistSongs[selectedPlaylist.id] : undefined}
+          onDelete={selectedPlaylist.id.startsWith('user-pl') ? () => deletePlaylist(selectedPlaylist.id) : undefined}
+        />
+      )}
 
-      {selectedNewsItem && (
-        <div className="absolute inset-0 z-[200] bg-black/95 backdrop-blur-3xl flex flex-col animate-in slide-in-from-bottom duration-300">
-          <div className="p-6 flex justify-end"><button onClick={() => setSelectedNewsItem(null)} className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center"><X size={24} /></button></div>
-          <div className="flex-1 overflow-y-auto px-6 pb-20">
-            <span className="text-6xl mb-4 block">{selectedNewsItem.emoji}</span>
-            <div className="flex gap-2 mb-4"><span className="text-[10px] font-black px-2 py-1 bg-purple-600 text-white rounded-full uppercase tracking-widest">{selectedNewsItem.category}</span></div>
-            <h1 className="text-3xl font-black mb-6 leading-tight">{selectedNewsItem.headline}</h1>
-            <p className="text-lg text-zinc-300 leading-relaxed whitespace-pre-line">{selectedNewsItem.content || selectedNewsItem.summary}</p>
+      {/* MODAL CREAR PLAYLIST */}
+      {showCreatePlaylist && (
+        <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-6 animate-in fade-in duration-200">
+          <div className="bg-zinc-900 rounded-3xl p-6 w-full max-w-sm border border-white/10">
+            <h3 className="text-xl font-bold mb-4">Nueva Playlist</h3>
+            <input 
+              autoFocus
+              value={newPlaylistName}
+              onChange={(e) => setNewPlaylistName(e.target.value)}
+              placeholder="Nombre de la lista"
+              className="w-full bg-white/10 rounded-xl p-3 mb-6 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setShowCreatePlaylist(false)} className="px-4 py-2 text-zinc-400 font-bold">Cancelar</button>
+              <button onClick={createPlaylist} className="px-6 py-2 bg-purple-600 rounded-full font-bold">Crear</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL AGREGAR A PLAYLIST */}
+      {showAddToPlaylist && (
+        <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-6 animate-in fade-in duration-200">
+          <div className="bg-zinc-900 rounded-3xl p-6 w-full max-w-sm border border-white/10 max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+               <h3 className="text-xl font-bold">Agregar a...</h3>
+               <button onClick={() => setShowAddToPlaylist(false)}><X size={24} className="text-zinc-400"/></button>
+            </div>
+            <div className="flex flex-col gap-3">
+              <button onClick={() => { setShowAddToPlaylist(false); setShowCreatePlaylist(true); }} className="flex items-center gap-3 p-4 bg-white/5 rounded-xl hover:bg-white/10">
+                <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center"><Plus size={20}/></div>
+                <span className="font-bold">Nueva Playlist</span>
+              </button>
+              <div className="h-px bg-white/10 my-1"/>
+              {userPlaylists.length === 0 && <p className="text-zinc-500 text-center py-4">No tienes playlists creadas</p>}
+              {userPlaylists.map(p => (
+                <button key={p.id} onClick={() => addToPlaylist(p.id)} className="flex items-center gap-3 p-3 hover:bg-white/5 rounded-xl">
+                  <img src={p.imageUrl} className="w-10 h-10 rounded-lg object-cover" />
+                  <span className="font-bold truncate">{p.name}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -479,12 +570,27 @@ export default function App() {
             {librarySubView === 'main' ? (
               <>
                 <h1 className="text-4xl font-black mb-10 tracking-tighter">Tu Biblioteca</h1>
-                <div onClick={() => setLibrarySubView('likes')} className="bg-white/5 backdrop-blur-xl p-6 rounded-[32px] border border-white/5 flex items-center gap-5 cursor-pointer hover:bg-white/10 active:scale-95 transition-all">
-                  <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-indigo-800 rounded-2xl flex items-center justify-center shadow-xl"><Heart fill="white" size={32} /></div>
-                  <div><h3 className="text-xl font-black">Tus me gusta</h3><p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">{favorites.length} Canciones</p></div>
+                
+                <button onClick={() => setShowCreatePlaylist(true)} className="w-full bg-white/10 border border-white/5 p-4 rounded-2xl flex items-center gap-4 mb-8 hover:bg-white/20 active:scale-95 transition-all">
+                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-black"><Plus size={24}/></div>
+                  <span className="font-bold text-lg">Crear Playlist</span>
+                </button>
+
+                <div className="flex flex-col gap-4 pb-32">
+                  <div onClick={() => setLibrarySubView('likes')} className="bg-gradient-to-br from-purple-900 to-black p-4 rounded-[24px] border border-white/10 flex items-center gap-4 cursor-pointer active:scale-95 transition-all">
+                    <div className="w-14 h-14 bg-purple-600 rounded-xl flex items-center justify-center shadow-lg"><Heart fill="white" size={24} /></div>
+                    <div><h3 className="text-lg font-bold">Tus Me Gusta</h3><p className="text-xs text-zinc-400 font-bold uppercase">{favorites.length} Canciones</p></div>
+                  </div>
+
+                  {userPlaylists.map(pl => (
+                    <div key={pl.id} onClick={() => setSelectedPlaylist(pl)} className="bg-white/5 p-4 rounded-[24px] border border-white/5 flex items-center gap-4 cursor-pointer hover:bg-white/10 active:scale-95 transition-all">
+                      <img src={pl.imageUrl} className="w-14 h-14 rounded-xl object-cover" />
+                      <div><h3 className="text-lg font-bold">{pl.name}</h3><p className="text-xs text-zinc-400 font-bold uppercase">{playlistSongs[pl.id]?.length || 0} Canciones</p></div>
+                    </div>
+                  ))}
                 </div>
               </>
-            ) : (
+            ) : librarySubView === 'likes' ? (
               <div className="animate-in slide-in-from-right duration-300">
                 <div className="flex items-center justify-between mb-8">
                    <button onClick={() => setLibrarySubView('main')} className="flex items-center gap-2 text-zinc-400"><ArrowLeft size={20}/> Volver</button>
@@ -502,25 +608,7 @@ export default function App() {
                   ))}
                 </div>
               </div>
-            )}
-          </div>
-        )}
-
-        {activeView === 'ai' && (
-          <div className="p-6 pt-16 flex-1 overflow-y-auto hide-scrollbar">
-            <header className="flex justify-between items-center mb-10"><h1 className="text-4xl font-black tracking-tighter">Mix IA</h1><div className="flex gap-2"><button onClick={() => { setMusicNews(STATIC_NEWS); loadBackgroundData(); }} className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center border border-white/10 active:rotate-180 transition-transform duration-500 hover:bg-white/10"><Sparkles size={18} className="text-purple-400" /></button></div></header>
-            <div className="flex flex-col gap-6 pb-32">
-              {musicNews.map((news, i) => (
-                  <div key={i} onClick={() => setSelectedNewsItem(news)} className="bg-black/40 border border-white/5 p-0 rounded-[32px] backdrop-blur-md hover:border-purple-500/30 transition-all group overflow-hidden relative cursor-pointer active:scale-95">
-                    <div className="h-24 w-full relative overflow-hidden"><img src={`https://picsum.photos/seed/${news.headline}/600/200`} className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" /><div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent"></div><span className="absolute bottom-3 left-6 text-3xl drop-shadow-lg filter grayscale-0">{news.emoji || "🎵"}</span></div>
-                    <div className="p-6 pt-2">
-                      <div className="flex justify-between items-start mb-3"><span className="text-[8px] font-black px-2 py-1 bg-white/10 text-white rounded-full uppercase tracking-widest backdrop-blur-md">{news.category}</span></div>
-                      <h3 className="text-xl font-black mb-2 text-white leading-tight">{news.headline}</h3>
-                      <p className="text-xs text-zinc-400 leading-relaxed mb-4 line-clamp-2">{news.summary}</p>
-                    </div>
-                  </div>
-              ))}
-            </div>
+            ) : null}
           </div>
         )}
 
@@ -539,7 +627,7 @@ export default function App() {
         )}
 
         <nav className="fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-3xl border-t border-white/5 pb-8 pt-4 px-8 flex justify-between items-center z-[80]">
-          {[ { id: 'home', icon: HomeIcon, label: 'Inicio' }, { id: 'search', icon: SearchIcon, label: 'Buscar' }, { id: 'library', icon: LibraryIcon, label: 'Biblioteca' }, { id: 'ai', icon: Sparkles, label: 'Mix IA' } ].map(item => (
+          {[ { id: 'home', icon: HomeIcon, label: 'Inicio' }, { id: 'search', icon: SearchIcon, label: 'Buscar' }, { id: 'library', icon: LibraryIcon, label: 'Biblioteca' } ].map(item => (
             <button key={item.id} onClick={() => { setActiveView(item.id as View); setSelectedPlaylist(null); }} className={`flex flex-col items-center gap-1 transition-all ${activeView === item.id ? 'text-white scale-110' : 'text-zinc-600'}`}>
               <item.icon size={22} strokeWidth={activeView === item.id ? 3 : 2} />
               <span className="text-[8px] font-black uppercase tracking-widest">{item.label}</span>
@@ -561,7 +649,12 @@ export default function App() {
               <img src={currentSong.coverUrl} className="w-full aspect-square rounded-[40px] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)] border border-white/5 mb-16" />
               <div className="w-full mb-10 flex items-center justify-between">
                 <div className="overflow-hidden"><h1 className="text-3xl font-black truncate mb-1">{currentSong.title}</h1><p className="text-lg text-zinc-500 font-bold truncate uppercase">{currentSong.artist}</p></div>
-                <button onClick={() => toggleFavorite(currentSong)} className={favorites.some(f => f.id === currentSong.id) ? "text-purple-500" : "text-zinc-700"}><Heart fill={favorites.some(f => f.id === currentSong.id) ? "currentColor" : "none"} size={32}/></button>
+                
+                {/* BOTONES DE ACCIÓN: AÑADIR A LISTA Y LIKE */}
+                <div className="flex gap-4">
+                  <button onClick={() => setShowAddToPlaylist(true)} className="text-zinc-400 hover:text-white transition-colors"><ListPlus size={28}/></button>
+                  <button onClick={() => toggleFavorite(currentSong)} className={favorites.some(f => f.id === currentSong.id) ? "text-purple-500" : "text-zinc-700"}><Heart fill={favorites.some(f => f.id === currentSong.id) ? "currentColor" : "none"} size={32}/></button>
+                </div>
               </div>
               <div className="w-full mb-12">
                 <div className="h-1 bg-white/10 rounded-full w-full mb-4 overflow-hidden"><div className="h-full bg-white transition-all duration-300" style={{ width: `${(currentTime/(currentSong.duration || 1))*100}%` }} /></div>
@@ -580,7 +673,7 @@ export default function App() {
       )}
     </div>
   );
-};
+}
 
 const SearchView: React.FC<{ onSelectSong: (s: Song, context?: Song[]) => void; currentSong: Song; isPlaying: boolean; showToast: (msg: string, type: 'success' | 'error' | 'info') => void; onSelectGenre: (p: Playlist) => void; }> = ({ onSelectSong, currentSong, isPlaying, showToast, onSelectGenre }) => {
   const [query, setQuery] = useState('');

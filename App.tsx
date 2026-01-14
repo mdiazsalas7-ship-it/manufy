@@ -29,7 +29,8 @@ import {
   ExternalLink,
   Mic,
   Share2,
-  TrendingUp
+  TrendingUp,
+  X // Importado para cerrar el modal
 } from 'lucide-react';
 import OpenAI from 'openai';
 import { View, Song, Playlist } from './types';
@@ -42,12 +43,20 @@ const TUNNEL_HEADERS = { 'Cloudflare-Skip-Browser-Warning': 'true' };
 const LOGO_URL = 'https://i.postimg.cc/05wxzk5G/unnamed.jpg';
 const BACKGROUND_IMAGE = 'https://i.postimg.cc/P5k7rD2R/unnamed.jpg';
 
-// --- INICIALIZACIÓN SEGURA Y PROFESIONAL ---
+// --- BASE DE DATOS LOCAL PARA PREDICTIVO (VELOCIDAD EXTREMA) ---
+const POPULAR_ARTISTS = [
+  "Bad Bunny", "Taylor Swift", "The Weeknd", "Drake", "Peso Pluma", 
+  "Karol G", "Feid", "Kendrick Lamar", "Ariana Grande", "Harry Styles",
+  "Shakira", "Rosalía", "Rauw Alejandro", "Myke Towers", "Eladio Carrión",
+  "Dua Lipa", "Beyoncé", "Justin Bieber", "Post Malone", "Billie Eilish",
+  "Travis Scott", "Kanye West", "Eminem", "Rihanna", "Bruno Mars",
+  "Adele", "Coldplay", "Imagine Dragons", "Maroon 5", "Ed Sheeran",
+  "J Balvin", "Maluma", "Daddy Yankee", "Don Omar", "Wisin y Yandel",
+  "Arcángel", "Anuel AA", "Ozuna", "Sech", "Mora", "Young Miko"
+];
 
-// 1. Leemos la variable de entorno. SI NO EXISTE, será undefined (pero no rompe nada).
+// --- INICIALIZACIÓN SEGURA ---
 const ENV_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
-
-// 2. Lógica condicional: Solo creamos el cliente si la clave existe y es válida.
 const aiClient = (ENV_KEY && ENV_KEY.startsWith('sk-or-')) 
   ? new OpenAI({
       baseURL: "https://openrouter.ai/api/v1",
@@ -68,6 +77,19 @@ const cleanAiResponse = (text: string) => {
     console.error("Error parseando JSON de IA:", e);
     return [];
   }
+};
+
+// CACHÉ INTELIGENTE: Guarda respuestas por 1 hora para velocidad instantánea
+const getCachedData = (key: string) => {
+  const cached = localStorage.getItem(key);
+  if (!cached) return null;
+  const { data, timestamp } = JSON.parse(cached);
+  if (Date.now() - timestamp > 3600000) return null; // 1 hora de validez
+  return data;
+};
+
+const setCachedData = (key: string, data: any) => {
+  localStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
 };
 
 async function resilientFetch(url: string, options: RequestInit = {}, timeout = 30000) {
@@ -150,10 +172,18 @@ const PlaylistDetail: React.FC<{
     const fetchSongs = async () => {
       setLoading(true);
       let songList = [];
+      const cacheKey = `playlist_${playlist.name}`;
       
-      // PROTECCIÓN: Si no hay cliente IA, usamos el Plan B automáticamente
+      // 1. Intentar cargar de caché primero
+      const cached = getCachedData(cacheKey);
+      if (cached) {
+        setSongs(cached); // Si existe, mostramos de inmediato (Instantáneo)
+        setLoading(false);
+        return; 
+      }
+
+      // 2. Si no hay caché, usamos IA o Fallback
       if (!aiClient) {
-        console.log("Modo Offline: Usando listas predefinidas.");
         songList = FALLBACK_SONGS[playlist.name] || FALLBACK_SONGS['Global Top 10'] || [];
       } else {
         try {
@@ -166,7 +196,7 @@ const PlaylistDetail: React.FC<{
           });
           const content = completion.choices[0].message.content || "[]";
           songList = cleanAiResponse(content);
-        } catch (e) {
+        } catch (e: any) {
           console.error("Error OpenRouter:", e);
           songList = FALLBACK_SONGS[playlist.name] || FALLBACK_SONGS['Global Top 10'] || [];
         }
@@ -193,7 +223,10 @@ const PlaylistDetail: React.FC<{
           } catch (e) {}
           return null;
         }));
-        setSongs(resolvedSongs.filter((s): s is Song => s !== null));
+        
+        const finalSongs = resolvedSongs.filter((s): s is Song => s !== null);
+        setSongs(finalSongs);
+        setCachedData(cacheKey, finalSongs); // Guardamos en caché para la próxima
       } catch (e) {
         console.error(e);
       } finally {
@@ -205,6 +238,7 @@ const PlaylistDetail: React.FC<{
 
   return (
     <div className="absolute inset-0 bg-black/90 z-[70] flex flex-col animate-in slide-in-from-right duration-500 overflow-y-auto hide-scrollbar">
+      {/* ... (Resto del componente igual) ... */}
       <div className="relative h-80 flex-shrink-0">
         <img src={playlist.imageUrl} className="w-full h-full object-cover blur-sm opacity-50" />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
@@ -283,10 +317,11 @@ export default function App() {
   const [librarySubView, setLibrarySubView] = useState<'main' | 'likes'>('main');
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
   
-  // Noticias IA
+  // Noticias IA Mejoradas
   const [musicNews, setMusicNews] = useState<any[]>([]);
   const [isNewsLoading, setIsNewsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [selectedNewsItem, setSelectedNewsItem] = useState<any | null>(null); // Nuevo estado para noticia expandida
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -294,9 +329,19 @@ export default function App() {
     setToast({ message, type });
   }, []);
 
+  // --- LOGICA DE CACHÉ PARA TRENDS Y NOTICIAS ---
+
   const fetchMusicTrends = async () => {
     setIsAiLoading(true);
-    // PROTECCIÓN: Si no hay IA, cargamos datos fijos y salimos
+    
+    // 1. Revisar Caché
+    const cached = getCachedData('trends_home');
+    if (cached) {
+      setAiPlaylists(cached);
+      setIsAiLoading(false);
+      return;
+    }
+
     if (!aiClient) {
       const fallback: Playlist[] = [
         { id: '1', name: 'Global Top 10', imageUrl: 'https://picsum.photos/seed/top1/600', type: 'playlist' },
@@ -317,10 +362,13 @@ export default function App() {
         ]
       });
       const content = completion.choices[0].message.content || "[]";
-      const trends = cleanAiResponse(content);
-      setAiPlaylists(trends.map((t: any, i: number) => ({
+      const trendsRaw = cleanAiResponse(content);
+      const trends = trendsRaw.map((t: any, i: number) => ({
         ...t, imageUrl: `https://picsum.photos/seed/trend-${i}/600`, type: 'playlist'
-      })));
+      }));
+      
+      setAiPlaylists(trends);
+      setCachedData('trends_home', trends); // Guardar en caché
     } catch (e) {
       console.warn("Error Trends:", e);
       setAiPlaylists([
@@ -333,11 +381,18 @@ export default function App() {
   const fetchMusicNews = async () => {
     setIsNewsLoading(true);
     
-    // PROTECCIÓN: Si no hay IA, mostramos aviso de configuración
+    // 1. Revisar Caché
+    const cached = getCachedData('music_news');
+    if (cached) {
+      setMusicNews(cached);
+      setIsNewsLoading(false);
+      return;
+    }
+
     if (!aiClient) {
       setMusicNews([
-        { headline: "Conecta tu IA", summary: "Configura VITE_OPENROUTER_API_KEY en Vercel para ver noticias reales.", category: "Sistema", emoji: "🔌" },
-        { headline: "Gira mundial confirmada", summary: "Varios artistas anuncian sus fechas.", category: "Concierto", emoji: "🌎" }
+        { headline: "Conecta tu IA", summary: "Configura VITE_OPENROUTER_API_KEY en Vercel para ver noticias reales.", category: "Sistema", emoji: "🔌", content: "Para ver el contenido completo de las noticias, necesitas configurar la clave API en el panel de Vercel. Una vez hecho, este mensaje desaparecerá y verás noticias en tiempo real." },
+        { headline: "Gira mundial confirmada", summary: "Varios artistas anuncian sus fechas.", category: "Concierto", emoji: "🌎", content: "Se espera que este año sea récord en giras mundiales con artistas como Taylor Swift y Bad Bunny liderando las listas de recaudación." }
       ]);
       setIsNewsLoading(false);
       return;
@@ -347,19 +402,21 @@ export default function App() {
       const completion = await aiClient.chat.completions.create({
         model: AI_MODEL,
         messages: [
-          { role: "system", content: "Eres un periodista musical experto. Responde SOLO JSON válido." },
-          { role: "user", content: "Genera 5 noticias musicales virales de HOY. Formato JSON array con: headline (max 8 palabras), summary (max 20 palabras), category, emoji." }
+          { role: "system", content: "Eres un periodista musical. Responde SOLO JSON válido." },
+          { role: "user", content: "Genera 5 noticias musicales virales de HOY. JSON array con: headline (max 8 palabras), summary (max 20 palabras), content (artículo completo de 3 parrafos), category, emoji." }
         ]
       });
       const content = completion.choices[0].message.content || "[]";
-      setMusicNews(cleanAiResponse(content));
+      const newsData = cleanAiResponse(content);
+      
+      setMusicNews(newsData);
+      setCachedData('music_news', newsData); // Guardar en caché
     } catch (e) {
       console.warn("Error News:", e);
       setMusicNews([{ headline: "Error de conexión", summary: "No se pudieron cargar las noticias.", category: "Error", emoji: "⚠️" }]);
     } finally { setIsNewsLoading(false); }
   };
 
-  // FUNCIONALIDAD: Leer noticias en voz alta
   const toggleSpeakNews = () => {
     if (isSpeaking) {
       window.speechSynthesis.cancel();
@@ -474,6 +531,27 @@ export default function App() {
         />
       )}
 
+      {/* --- MODAL DE NOTICIA EXPANDIDA (PROFUNDIDAD) --- */}
+      {selectedNewsItem && (
+        <div className="absolute inset-0 z-[200] bg-black/95 backdrop-blur-3xl flex flex-col animate-in slide-in-from-bottom duration-300">
+          <div className="p-6 flex justify-end">
+            <button onClick={() => setSelectedNewsItem(null)} className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
+              <X size={24} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-6 pb-20">
+            <span className="text-6xl mb-4 block">{selectedNewsItem.emoji}</span>
+            <div className="flex gap-2 mb-4">
+              <span className="text-[10px] font-black px-2 py-1 bg-purple-600 text-white rounded-full uppercase tracking-widest">{selectedNewsItem.category}</span>
+            </div>
+            <h1 className="text-3xl font-black mb-6 leading-tight">{selectedNewsItem.headline}</h1>
+            <p className="text-lg text-zinc-300 leading-relaxed whitespace-pre-line">
+              {selectedNewsItem.content || selectedNewsItem.summary}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="relative z-10 h-full flex flex-col">
         {activeView === 'home' && (
           <div className="p-6 pt-16 flex-1 overflow-y-auto hide-scrollbar">
@@ -562,14 +640,12 @@ export default function App() {
             <header className="flex justify-between items-center mb-10">
               <h1 className="text-4xl font-black tracking-tighter">Mix IA</h1>
               <div className="flex gap-2">
-                {/* BOTÓN REFRESCAR NOTICIAS */}
                 <button 
                   onClick={fetchMusicNews} 
                   className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center border border-white/10 active:rotate-180 transition-transform duration-500 hover:bg-white/10"
                 >
                   <Sparkles size={18} className="text-purple-400" />
                 </button>
-                {/* BOTÓN ESCUCHAR NOTICIAS (TEXT-TO-SPEECH) */}
                 {musicNews.length > 0 && (
                   <button 
                     onClick={toggleSpeakNews} 
@@ -580,17 +656,6 @@ export default function App() {
                 )}
               </div>
             </header>
-
-            <div className="mb-8 p-6 bg-gradient-to-br from-purple-900/40 to-transparent border border-purple-500/20 rounded-[32px] backdrop-blur-xl relative overflow-hidden">
-              <div className="absolute -right-10 -top-10 w-40 h-40 bg-purple-600/30 rounded-full blur-3xl"></div>
-              <div className="flex items-center gap-3 mb-4 relative z-10">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-purple-200">En Vivo • Manufy Intelligence</span>
-              </div>
-              <p className="text-sm font-medium leading-relaxed text-zinc-200 relative z-10">
-                Tu resumen diario personalizado. Pulsa el micrófono para escuchar las novedades mientras navegas.
-              </p>
-            </div>
 
             <div className="flex flex-col gap-6 pb-32">
               {musicNews.length === 0 && !isNewsLoading && (
@@ -603,8 +668,7 @@ export default function App() {
               
               {isNewsLoading ? [...Array(3)].map((_, i) => <div key={i} className="h-40 bg-white/5 animate-pulse rounded-[32px]" />) :
                 musicNews.map((news, i) => (
-                  <div key={i} className="bg-black/40 border border-white/5 p-0 rounded-[32px] backdrop-blur-md hover:border-purple-500/30 transition-all group overflow-hidden relative">
-                    {/* IMAGEN GENERADA AUTOMÁTICAMENTE */}
+                  <div key={i} onClick={() => setSelectedNewsItem(news)} className="bg-black/40 border border-white/5 p-0 rounded-[32px] backdrop-blur-md hover:border-purple-500/30 transition-all group overflow-hidden relative cursor-pointer active:scale-95">
                     <div className="h-24 w-full relative overflow-hidden">
                        <img 
                          src={`https://picsum.photos/seed/${news.headline}/600/200`} 
@@ -626,9 +690,6 @@ export default function App() {
                         <button className="flex-1 py-3 bg-white/5 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-300 hover:bg-white/10 transition-colors">
                           Leer completo <ExternalLink size={12}/>
                         </button>
-                        <button className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center hover:text-purple-400 transition-colors">
-                           <Share2 size={16} />
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -640,6 +701,7 @@ export default function App() {
 
         {!isFullPlayerOpen && currentSong.id !== 'current' && (
           <div onClick={() => setIsFullPlayerOpen(true)} className="mx-3 mb-24 bg-zinc-900/90 backdrop-blur-2xl rounded-2xl p-2.5 flex items-center justify-between border border-white/5 shadow-2xl animate-slide-up cursor-pointer">
+            {/* ... Mini Player igual ... */}
             <div className="flex items-center gap-3 overflow-hidden pl-1">
               <img src={currentSong.coverUrl} className="w-11 h-11 rounded-xl object-cover shadow-lg" />
               <div className="truncate">
@@ -675,6 +737,7 @@ export default function App() {
 
       {isFullPlayerOpen && (
         <div className="fixed inset-0 z-[100] bg-black flex flex-col animate-in slide-in-from-bottom duration-500">
+          {/* ... Full Player igual ... */}
           <div className="fixed inset-0 z-0">
              <img src={currentSong.coverUrl} className="w-full h-full object-cover blur-[100px] opacity-30 scale-150" />
           </div>
@@ -726,16 +789,29 @@ export default function App() {
   );
 }
 
-// BUSQUEDA
+// BUSQUEDA PREDICTIVA (MEJORADA)
 const SearchView: React.FC<{ onSelectSong: (s: Song) => void; currentSong: Song; isPlaying: boolean; showToast: (msg: string, type: 'success' | 'error' | 'info') => void; onSelectGenre: (p: Playlist) => void; }> = ({ onSelectSong, currentSong, isPlaying, showToast, onSelectGenre }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Song[]>([]);
   const [loading, setLoading] = useState(false);
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault(); if (!query.trim()) return;
-    setLoading(true); setResults([]);
+  const [suggestions, setSuggestions] = useState<string[]>([]); // Estado para sugerencias
+
+  // Efecto para filtrar sugerencias mientras escribes
+  useEffect(() => {
+    if (query.trim().length > 1) {
+      const matches = POPULAR_ARTISTS.filter(artist => 
+        artist.toLowerCase().includes(query.toLowerCase())
+      ).slice(0, 5); // Max 5 sugerencias
+      setSuggestions(matches);
+    } else {
+      setSuggestions([]);
+    }
+  }, [query]);
+
+  const executeSearch = async (term: string) => {
+    setLoading(true); setResults([]); setSuggestions([]); setQuery(term);
     try {
-      const response = await resilientFetch(`${BACKEND_URL}/buscar?q=${encodeURIComponent(query.trim())}`);
+      const response = await resilientFetch(`${BACKEND_URL}/buscar?q=${encodeURIComponent(term)}`);
       if (!response.ok) throw new Error();
       const data = await response.json();
       setResults(data.map((item: any, index: number) => ({
@@ -749,13 +825,41 @@ const SearchView: React.FC<{ onSelectSong: (s: Song) => void; currentSong: Song;
     } catch (err) { showToast("Error al buscar", 'error'); }
     finally { setLoading(false); }
   };
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault(); if (!query.trim()) return;
+    executeSearch(query.trim());
+  };
+
   return (
     <div className="p-6 pt-16 flex-1 overflow-y-auto hide-scrollbar">
       <h1 className="text-4xl font-black mb-8 tracking-tighter">Buscar</h1>
       <form onSubmit={handleSearch} className="relative mb-10">
         <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={20} />
-        <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Artistas o canciones" className="w-full bg-white/10 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-purple-600 transition-all placeholder:text-zinc-600" />
+        <input 
+          type="text" 
+          value={query} 
+          onChange={(e) => setQuery(e.target.value)} 
+          placeholder="Artistas o canciones" 
+          className="w-full bg-white/10 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-purple-600 transition-all placeholder:text-zinc-600" 
+        />
+        {/* LISTA DE SUGERENCIAS PREDICTIVAS */}
+        {suggestions.length > 0 && (
+          <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl z-50">
+            {suggestions.map((suggestion, idx) => (
+              <div 
+                key={idx} 
+                onClick={() => executeSearch(suggestion)}
+                className="px-4 py-3 hover:bg-white/10 cursor-pointer flex items-center gap-3"
+              >
+                <SearchIcon size={14} className="text-zinc-500" />
+                <span className="text-sm font-bold text-white">{suggestion}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </form>
+      
       {loading ? <div className="flex flex-col gap-4">{[...Array(5)].map((_, i) => <div key={i} className="h-16 bg-white/5 animate-pulse rounded-2xl" />)}</div> :
         results.length > 0 ? (
           <div className="flex flex-col gap-3">

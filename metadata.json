@@ -1,0 +1,7 @@
+{
+  "name": "Manufy Music",
+  "description": "A premium music streaming experience with AI-powered recommendations and a sleek, dark-themed interface.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

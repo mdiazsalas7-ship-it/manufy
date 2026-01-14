@@ -26,9 +26,11 @@ import {
   Music,
   Globe,
   Newspaper,
-  ExternalLink
+  ExternalLink,
+  Mic,
+  Share2,
+  TrendingUp
 } from 'lucide-react';
-// CAMBIO 1: Importamos OpenAI en lugar de GoogleGenAI
 import OpenAI from 'openai';
 import { View, Song, Playlist } from './types';
 import { GENRES, INITIAL_SONG } from './constants';
@@ -40,26 +42,26 @@ const TUNNEL_HEADERS = { 'Cloudflare-Skip-Browser-Warning': 'true' };
 const LOGO_URL = 'https://i.postimg.cc/05wxzk5G/unnamed.jpg';
 const BACKGROUND_IMAGE = 'https://i.postimg.cc/P5k7rD2R/unnamed.jpg';
 
-// CAMBIO 2: Configuración de OpenRouter (SEGURA)
-// Ahora busca la clave en el archivo .env o en la configuración de Vercel
-const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY; 
+// --- INICIALIZACIÓN SEGURA Y PROFESIONAL ---
 
-// Inicializamos el cliente apuntando a OpenRouter
-const aiClient = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: OPENROUTER_API_KEY,
-  dangerouslyAllowBrowser: true // Necesario para que funcione en React (Frontend)
-});
+// 1. Leemos la variable de entorno. SI NO EXISTE, será undefined (pero no rompe nada).
+const ENV_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
 
-// Modelo a usar (GPT-4o Mini es rápido y barato)
+// 2. Lógica condicional: Solo creamos el cliente si la clave existe y es válida.
+const aiClient = (ENV_KEY && ENV_KEY.startsWith('sk-or-')) 
+  ? new OpenAI({
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: ENV_KEY, 
+      dangerouslyAllowBrowser: true 
+    }) 
+  : null;
+
 const AI_MODEL = "openai/gpt-4o-mini";
 
 // --- UTILIDADES ---
 
-// Función auxiliar para limpiar respuestas JSON de la IA
 const cleanAiResponse = (text: string) => {
   try {
-    // Eliminar bloques de código markdown si existen (```json ... ```)
     const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
     return JSON.parse(cleaned);
   } catch (e) {
@@ -148,32 +150,28 @@ const PlaylistDetail: React.FC<{
     const fetchSongs = async () => {
       setLoading(true);
       let songList = [];
-      try {
-        // CAMBIO 3: Solicitud a OpenRouter
-        const completion = await aiClient.chat.completions.create({
-          model: AI_MODEL,
-          messages: [
-            {
-              role: "system",
-              content: "Eres un experto musical. Responde SOLO con un JSON válido. Sin texto extra."
-            },
-            {
-              role: "user",
-              content: `Genera una lista de 10 canciones famosas para la categoría: "${playlist.name}". Formato JSON array de objetos con propiedades 'title' y 'artist'.`
-            }
-          ]
-        });
-        
-        const content = completion.choices[0].message.content || "[]";
-        songList = cleanAiResponse(content);
-
-      } catch (e: any) {
-        console.error("Error OpenRouter:", e);
-        if (e?.status === 402 || e?.status === 429) showToast("Saldo OpenRouter agotado / Límite excedido", 'info');
+      
+      // PROTECCIÓN: Si no hay cliente IA, usamos el Plan B automáticamente
+      if (!aiClient) {
+        console.log("Modo Offline: Usando listas predefinidas.");
         songList = FALLBACK_SONGS[playlist.name] || FALLBACK_SONGS['Global Top 10'] || [];
+      } else {
+        try {
+          const completion = await aiClient.chat.completions.create({
+            model: AI_MODEL,
+            messages: [
+              { role: "system", content: "Eres un experto musical. Responde SOLO con un JSON válido." },
+              { role: "user", content: `Genera una lista de 10 canciones famosas para la categoría: "${playlist.name}". Formato JSON array de objetos con propiedades 'title' y 'artist'.` }
+            ]
+          });
+          const content = completion.choices[0].message.content || "[]";
+          songList = cleanAiResponse(content);
+        } catch (e) {
+          console.error("Error OpenRouter:", e);
+          songList = FALLBACK_SONGS[playlist.name] || FALLBACK_SONGS['Global Top 10'] || [];
+        }
       }
       
-      // Proceso de búsqueda de URLs (igual que antes)
       try {
         const resolvedSongs = await Promise.all(songList.map(async (s: any, i: number): Promise<Song | null> => {
           try {
@@ -218,7 +216,9 @@ const PlaylistDetail: React.FC<{
         </div>
         <div className="absolute bottom-6 left-6 right-6">
           <h1 className="text-4xl font-black tracking-tighter mb-2">{playlist.name}</h1>
-          <p className="text-zinc-400 text-sm font-bold uppercase tracking-widest">Powered by OpenRouter</p>
+          <p className="text-zinc-400 text-sm font-bold uppercase tracking-widest">
+             {aiClient ? "Powered by OpenRouter" : "Modo Offline"}
+          </p>
         </div>
       </div>
 
@@ -286,6 +286,7 @@ export default function App() {
   // Noticias IA
   const [musicNews, setMusicNews] = useState<any[]>([]);
   const [isNewsLoading, setIsNewsLoading] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -295,8 +296,19 @@ export default function App() {
 
   const fetchMusicTrends = async () => {
     setIsAiLoading(true);
+    // PROTECCIÓN: Si no hay IA, cargamos datos fijos y salimos
+    if (!aiClient) {
+      const fallback: Playlist[] = [
+        { id: '1', name: 'Global Top 10', imageUrl: 'https://picsum.photos/seed/top1/600', type: 'playlist' },
+        { id: '2', name: 'Nuevos Lanzamientos', imageUrl: 'https://picsum.photos/seed/new1/600', type: 'playlist' },
+        { id: '3', name: 'Latino Gang', imageUrl: 'https://picsum.photos/seed/latino1/600', type: 'playlist' },
+      ];
+      setAiPlaylists(fallback);
+      setIsAiLoading(false);
+      return;
+    }
+
     try {
-      // CAMBIO 4: Solicitud de Tendencias a OpenRouter
       const completion = await aiClient.chat.completions.create({
         model: AI_MODEL,
         messages: [
@@ -304,51 +316,73 @@ export default function App() {
           { role: "user", content: "Dame 6 categorías musicales para una app de streaming (ej: Top Global, Novedades). Formato JSON array con: id, name, description." }
         ]
       });
-
       const content = completion.choices[0].message.content || "[]";
       const trends = cleanAiResponse(content);
-      
       setAiPlaylists(trends.map((t: any, i: number) => ({
         ...t, imageUrl: `https://picsum.photos/seed/trend-${i}/600`, type: 'playlist'
       })));
     } catch (e) {
-      console.error("AI Error:", e);
-      const fallback: Playlist[] = [
+      console.warn("Error Trends:", e);
+      setAiPlaylists([
         { id: '1', name: 'Global Top 10', imageUrl: 'https://picsum.photos/seed/top1/600', type: 'playlist' },
         { id: '2', name: 'Nuevos Lanzamientos', imageUrl: 'https://picsum.photos/seed/new1/600', type: 'playlist' },
-        { id: '3', name: 'Latino Gang', imageUrl: 'https://picsum.photos/seed/latino1/600', type: 'playlist' },
-      ];
-      setAiPlaylists(fallback);
+      ]);
     } finally { setIsAiLoading(false); }
   };
 
   const fetchMusicNews = async () => {
     setIsNewsLoading(true);
+    
+    // PROTECCIÓN: Si no hay IA, mostramos aviso de configuración
+    if (!aiClient) {
+      setMusicNews([
+        { headline: "Conecta tu IA", summary: "Configura VITE_OPENROUTER_API_KEY en Vercel para ver noticias reales.", category: "Sistema", emoji: "🔌" },
+        { headline: "Gira mundial confirmada", summary: "Varios artistas anuncian sus fechas.", category: "Concierto", emoji: "🌎" }
+      ]);
+      setIsNewsLoading(false);
+      return;
+    }
+
     try {
-      // CAMBIO 5: Solicitud de Noticias a OpenRouter
       const completion = await aiClient.chat.completions.create({
         model: AI_MODEL,
         messages: [
-          { role: "system", content: "Eres un periodista musical. Responde SOLO JSON válido." },
-          { role: "user", content: "Genera 5 noticias musicales breves. JSON array con: headline, summary, category." }
+          { role: "system", content: "Eres un periodista musical experto. Responde SOLO JSON válido." },
+          { role: "user", content: "Genera 5 noticias musicales virales de HOY. Formato JSON array con: headline (max 8 palabras), summary (max 20 palabras), category, emoji." }
         ]
       });
-
       const content = completion.choices[0].message.content || "[]";
       setMusicNews(cleanAiResponse(content));
-
     } catch (e) {
-      setMusicNews([
-        { headline: "OpenRouter Conectado", summary: "El sistema ahora usa IA sin bloqueos regionales.", category: "Sistema" },
-        { headline: "Gira mundial confirmada", summary: "Varios artistas anuncian sus fechas.", category: "Concierto" }
-      ]);
+      console.warn("Error News:", e);
+      setMusicNews([{ headline: "Error de conexión", summary: "No se pudieron cargar las noticias.", category: "Error", emoji: "⚠️" }]);
     } finally { setIsNewsLoading(false); }
+  };
+
+  // FUNCIONALIDAD: Leer noticias en voz alta
+  const toggleSpeakNews = () => {
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    } else {
+      if (musicNews.length === 0) return;
+      
+      const textToRead = "Resumen musical. " + musicNews.map(n => `${n.headline}. ${n.summary}`).join(". ");
+      const utterance = new SpeechSynthesisUtterance(textToRead);
+      utterance.lang = 'es-ES';
+      utterance.rate = 1.1;
+      
+      utterance.onend = () => setIsSpeaking(false);
+      window.speechSynthesis.speak(utterance);
+      setIsSpeaking(true);
+    }
   };
 
   useEffect(() => {
     const savedFavs = localStorage.getItem('manufy_favorites');
     if (savedFavs) setFavorites(JSON.parse(savedFavs));
     fetchMusicTrends();
+    return () => window.speechSynthesis.cancel();
   }, []);
 
   useEffect(() => {
@@ -526,43 +560,77 @@ export default function App() {
         {activeView === 'ai' && (
           <div className="p-6 pt-16 flex-1 overflow-y-auto hide-scrollbar">
             <header className="flex justify-between items-center mb-10">
-              <h1 className="text-4xl font-black tracking-tighter">IA News</h1>
-              <button 
-                onClick={fetchMusicNews} 
-                className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center border border-white/10 active:rotate-180 transition-transform duration-500"
-              >
-                <Sparkles size={18} className="text-purple-400" />
-              </button>
+              <h1 className="text-4xl font-black tracking-tighter">Mix IA</h1>
+              <div className="flex gap-2">
+                {/* BOTÓN REFRESCAR NOTICIAS */}
+                <button 
+                  onClick={fetchMusicNews} 
+                  className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center border border-white/10 active:rotate-180 transition-transform duration-500 hover:bg-white/10"
+                >
+                  <Sparkles size={18} className="text-purple-400" />
+                </button>
+                {/* BOTÓN ESCUCHAR NOTICIAS (TEXT-TO-SPEECH) */}
+                {musicNews.length > 0 && (
+                  <button 
+                    onClick={toggleSpeakNews} 
+                    className={`w-10 h-10 rounded-full flex items-center justify-center border border-white/10 transition-all ${isSpeaking ? 'bg-purple-600 animate-pulse' : 'bg-white/5 hover:bg-white/10'}`}
+                  >
+                    {isSpeaking ? <Wifi size={18} className="text-white" /> : <Mic size={18} className="text-zinc-400" />}
+                  </button>
+                )}
+              </div>
             </header>
 
-            <div className="mb-8 p-6 bg-gradient-to-br from-purple-600/20 to-transparent border border-purple-500/20 rounded-[32px] backdrop-blur-xl">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-purple-400">Powered by ChatGPT</span>
+            <div className="mb-8 p-6 bg-gradient-to-br from-purple-900/40 to-transparent border border-purple-500/20 rounded-[32px] backdrop-blur-xl relative overflow-hidden">
+              <div className="absolute -right-10 -top-10 w-40 h-40 bg-purple-600/30 rounded-full blur-3xl"></div>
+              <div className="flex items-center gap-3 mb-4 relative z-10">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-purple-200">En Vivo • Manufy Intelligence</span>
               </div>
-              <p className="text-sm font-medium leading-relaxed text-zinc-300">Descubre lo último en la industria musical, sin bloqueos y en tiempo real.</p>
+              <p className="text-sm font-medium leading-relaxed text-zinc-200 relative z-10">
+                Tu resumen diario personalizado. Pulsa el micrófono para escuchar las novedades mientras navegas.
+              </p>
             </div>
 
             <div className="flex flex-col gap-6 pb-32">
               {musicNews.length === 0 && !isNewsLoading && (
                  <div className="flex flex-col items-center justify-center py-20 text-center">
                     <Newspaper size={64} className="text-zinc-800 mb-4 opacity-20" />
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600">Pulsa la chispa para noticias</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600">Sin noticias aún</p>
+                    <button onClick={fetchMusicNews} className="mt-4 px-6 py-2 bg-purple-600/20 text-purple-400 rounded-full text-xs font-bold hover:bg-purple-600/40 transition-colors">Generar ahora</button>
                  </div>
               )}
               
-              {isNewsLoading ? [...Array(3)].map((_, i) => <div key={i} className="h-32 bg-white/5 animate-pulse rounded-3xl" />) :
+              {isNewsLoading ? [...Array(3)].map((_, i) => <div key={i} className="h-40 bg-white/5 animate-pulse rounded-[32px]" />) :
                 musicNews.map((news, i) => (
-                  <div key={i} className="bg-white/5 border border-white/5 p-6 rounded-[32px] backdrop-blur-md hover:bg-white/10 transition-all group">
-                    <div className="flex justify-between items-start mb-3">
-                      <span className="text-[8px] font-black px-2 py-1 bg-purple-600/20 text-purple-400 rounded-full uppercase tracking-widest">{news.category}</span>
-                      <span className="text-[9px] text-zinc-600 font-bold uppercase">Hoy</span>
+                  <div key={i} className="bg-black/40 border border-white/5 p-0 rounded-[32px] backdrop-blur-md hover:border-purple-500/30 transition-all group overflow-hidden relative">
+                    {/* IMAGEN GENERADA AUTOMÁTICAMENTE */}
+                    <div className="h-24 w-full relative overflow-hidden">
+                       <img 
+                         src={`https://picsum.photos/seed/${news.headline}/600/200`} 
+                         className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" 
+                       />
+                       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent"></div>
+                       <span className="absolute bottom-3 left-6 text-3xl drop-shadow-lg filter grayscale-0">{news.emoji || "🎵"}</span>
                     </div>
-                    <h3 className="text-xl font-black mb-2 group-hover:text-purple-400 transition-colors leading-tight">{news.headline}</h3>
-                    <p className="text-xs text-zinc-400 leading-relaxed mb-4">{news.summary}</p>
-                    <button className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-colors">
-                      Leer más <ExternalLink size={12}/>
-                    </button>
+                    
+                    <div className="p-6 pt-2">
+                      <div className="flex justify-between items-start mb-3">
+                        <span className="text-[8px] font-black px-2 py-1 bg-white/10 text-white rounded-full uppercase tracking-widest backdrop-blur-md">{news.category}</span>
+                        <span className="text-[9px] text-zinc-500 font-bold uppercase flex items-center gap-1"><TrendingUp size={10}/> Viral</span>
+                      </div>
+                      <h3 className="text-xl font-black mb-2 text-white leading-tight">{news.headline}</h3>
+                      <p className="text-xs text-zinc-400 leading-relaxed mb-4 line-clamp-2">{news.summary}</p>
+                      
+                      <div className="flex gap-3">
+                        <button className="flex-1 py-3 bg-white/5 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-300 hover:bg-white/10 transition-colors">
+                          Leer completo <ExternalLink size={12}/>
+                        </button>
+                        <button className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center hover:text-purple-400 transition-colors">
+                           <Share2 size={16} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 ))
               }

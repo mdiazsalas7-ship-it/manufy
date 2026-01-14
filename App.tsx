@@ -43,7 +43,7 @@ const TUNNEL_HEADERS = { 'Cloudflare-Skip-Browser-Warning': 'true' };
 const LOGO_URL = 'https://i.postimg.cc/05wxzk5G/unnamed.jpg';
 const BACKGROUND_IMAGE = 'https://i.postimg.cc/P5k7rD2R/unnamed.jpg';
 
-// --- BASE DE DATOS LOCAL PARA PREDICTIVO (VELOCIDAD EXTREMA) ---
+// --- BASE DE DATOS LOCAL PARA PREDICTIVO ---
 const POPULAR_ARTISTS = [
   "Bad Bunny", "Taylor Swift", "The Weeknd", "Drake", "Peso Pluma", 
   "Karol G", "Feid", "Kendrick Lamar", "Ariana Grande", "Harry Styles",
@@ -79,12 +79,11 @@ const cleanAiResponse = (text: string) => {
   }
 };
 
-// CACHÉ INTELIGENTE
 const getCachedData = (key: string) => {
   const cached = localStorage.getItem(key);
   if (!cached) return null;
   const { data, timestamp } = JSON.parse(cached);
-  if (Date.now() - timestamp > 3600000) return null; // 1 hora de validez
+  if (Date.now() - timestamp > 3600000) return null; 
   return data;
 };
 
@@ -156,11 +155,11 @@ const MusicEqualizer = () => (
 );
 
 // --- VISTA DETALLE PLAYLIST ---
-
+// Ahora onSelectSong acepta la lista completa para armar la cola
 const PlaylistDetail: React.FC<{ 
   playlist: Playlist; 
   onBack: () => void; 
-  onSelectSong: (s: Song) => void;
+  onSelectSong: (s: Song, context?: Song[]) => void;
   currentSong: Song;
   isPlaying: boolean;
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
@@ -174,7 +173,6 @@ const PlaylistDetail: React.FC<{
       let songList = [];
       const cacheKey = `playlist_${playlist.name}`;
       
-      // 1. Intentar cargar de caché primero
       const cached = getCachedData(cacheKey);
       if (cached) {
         setSongs(cached);
@@ -182,7 +180,6 @@ const PlaylistDetail: React.FC<{
         return; 
       }
 
-      // 2. Si no hay caché, usamos IA o Fallback
       if (!aiClient) {
         songList = FALLBACK_SONGS[playlist.name] || FALLBACK_SONGS['Global Top 10'] || [];
       } else {
@@ -257,7 +254,11 @@ const PlaylistDetail: React.FC<{
 
       <div className="p-6 flex-1 bg-black/80 backdrop-blur-xl rounded-t-[40px] -mt-10 relative z-10 border-t border-white/5">
         <div className="flex justify-between items-center mb-8">
-           <button className="w-14 h-14 bg-purple-600 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform">
+           <button 
+             // PLAY ALL (Toma la primera y pasa toda la lista)
+             onClick={() => songs.length > 0 && onSelectSong(songs[0], songs)}
+             className="w-14 h-14 bg-purple-600 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+           >
               <Play fill="white" size={28} className="ml-1" />
            </button>
            <div className="flex gap-4 text-zinc-500 items-center">
@@ -281,7 +282,7 @@ const PlaylistDetail: React.FC<{
         ) : (
           <div className="flex flex-col gap-4 pb-32">
             {songs.map((song, i) => (
-              <div key={song.id} onClick={() => onSelectSong(song)} className={`flex items-center gap-4 group cursor-pointer p-2 rounded-xl transition-all ${currentSong.id === song.id ? 'bg-purple-600/10' : 'hover:bg-white/5'}`}>
+              <div key={song.id} onClick={() => onSelectSong(song, songs)} className={`flex items-center gap-4 group cursor-pointer p-2 rounded-xl transition-all ${currentSong.id === song.id ? 'bg-purple-600/10' : 'hover:bg-white/5'}`}>
                 <span className="text-zinc-700 font-black text-xs w-4">{i + 1}</span>
                 <img src={song.coverUrl} className="w-12 h-12 rounded-lg object-cover shadow-md" />
                 <div className="flex-1 overflow-hidden">
@@ -309,6 +310,10 @@ export default function App() {
   const [currentTime, setCurrentTime] = useState(0);
   const [favorites, setFavorites] = useState<Song[]>([]);
   const [history, setHistory] = useState<Song[]>([]);
+  
+  // --- NUEVO: COLA DE REPRODUCCIÓN ---
+  const [queue, setQueue] = useState<Song[]>([]);
+
   const [aiPlaylists, setAiPlaylists] = useState<Playlist[]>([]);
   const [isAiLoading, setIsAiLoading] = useState(true);
   const [playbackUrl, setPlaybackUrl] = useState<string | undefined>(undefined);
@@ -316,7 +321,6 @@ export default function App() {
   const [librarySubView, setLibrarySubView] = useState<'main' | 'likes'>('main');
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
   
-  // Noticias IA Mejoradas
   const [musicNews, setMusicNews] = useState<any[]>([]);
   const [isNewsLoading, setIsNewsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -330,8 +334,6 @@ export default function App() {
 
   const fetchMusicTrends = async () => {
     setIsAiLoading(true);
-    
-    // 1. Revisar Caché
     const cached = getCachedData('trends_home');
     if (cached) {
       setAiPlaylists(cached);
@@ -363,7 +365,6 @@ export default function App() {
       const trends = trendsRaw.map((t: any, i: number) => ({
         ...t, imageUrl: `https://picsum.photos/seed/trend-${i}/600`, type: 'playlist'
       }));
-      
       setAiPlaylists(trends);
       setCachedData('trends_home', trends);
     } catch (e) {
@@ -377,35 +378,30 @@ export default function App() {
 
   const fetchMusicNews = async () => {
     setIsNewsLoading(true);
-    
-    // 1. Revisar Caché
     const cached = getCachedData('music_news');
     if (cached) {
       setMusicNews(cached);
       setIsNewsLoading(false);
       return;
     }
-
     if (!aiClient) {
       setMusicNews([
-        { headline: "Conecta tu IA", summary: "Configura VITE_OPENROUTER_API_KEY en Vercel para ver noticias reales.", category: "Sistema", emoji: "🔌", content: "Para ver el contenido completo de las noticias, necesitas configurar la clave API en el panel de Vercel. Una vez hecho, este mensaje desaparecerá y verás noticias en tiempo real." },
-        { headline: "Gira mundial confirmada", summary: "Varios artistas anuncian sus fechas.", category: "Concierto", emoji: "🌎", content: "Se espera que este año sea récord en giras mundiales con artistas como Taylor Swift y Bad Bunny liderando las listas de recaudación." }
+        { headline: "Conecta tu IA", summary: "Configura VITE_OPENROUTER_API_KEY en Vercel.", category: "Sistema", emoji: "🔌", content: "Para ver el contenido completo, configura la clave API en Vercel." },
+        { headline: "Gira mundial", summary: "Varios artistas anuncian fechas.", category: "Concierto", emoji: "🌎", content: "Se espera un año récord en giras." }
       ]);
       setIsNewsLoading(false);
       return;
     }
-
     try {
       const completion = await aiClient.chat.completions.create({
         model: AI_MODEL,
         messages: [
           { role: "system", content: "Eres un periodista musical. Responde SOLO JSON válido." },
-          { role: "user", content: "Genera 5 noticias musicales virales de HOY. JSON array con: headline (max 8 palabras), summary (max 20 palabras), content (artículo completo de 3 parrafos), category, emoji." }
+          { role: "user", content: "Genera 5 noticias musicales virales de HOY. JSON array con: headline (max 8 palabras), summary (max 20 palabras), content, category, emoji." }
         ]
       });
       const content = completion.choices[0].message.content || "[]";
       const newsData = cleanAiResponse(content);
-      
       setMusicNews(newsData);
       setCachedData('music_news', newsData);
     } catch (e) {
@@ -420,12 +416,10 @@ export default function App() {
       setIsSpeaking(false);
     } else {
       if (musicNews.length === 0) return;
-      
       const textToRead = "Resumen musical. " + musicNews.map(n => `${n.headline}. ${n.summary}`).join(". ");
       const utterance = new SpeechSynthesisUtterance(textToRead);
       utterance.lang = 'es-ES';
       utterance.rate = 1.1;
-      
       utterance.onend = () => setIsSpeaking(false);
       window.speechSynthesis.speak(utterance);
       setIsSpeaking(true);
@@ -466,16 +460,47 @@ export default function App() {
     else audioRef.current.pause();
   }, [isPlaying, playbackUrl]);
 
-  const onSelectSong = (song: Song) => {
+  // --- FUNCIÓN PRINCIPAL DE REPRODUCCIÓN (Ahora acepta Cola) ---
+  const onSelectSong = (song: Song, contextQueue?: Song[]) => {
     setCurrentSong(song);
     setIsPlaying(true);
     setCurrentTime(0);
     setHistory(prev => [song, ...prev.filter(s => s.id !== song.id)].slice(0, 15));
+    // Si me pasan una lista nueva (ej: click en playlist o favoritos), actualizo la cola
+    if (contextQueue) {
+      setQueue(contextQueue);
+    }
   };
 
   const togglePlay = () => {
     if (currentSong.id === 'current') return;
     setIsPlaying(!isPlaying);
+  };
+
+  // --- LÓGICA DE AUTO-PLAY (Siguiente Canción) ---
+  const handleSongEnd = () => {
+    // Buscamos dónde estamos en la cola
+    const currentIndex = queue.findIndex(s => s.id === currentSong.id);
+    
+    // Si hay una siguiente, la ponemos
+    if (currentIndex !== -1 && currentIndex < queue.length - 1) {
+      // Nota: No pasamos 'queue' de nuevo para no resetearla, solo cambiamos la canción
+      onSelectSong(queue[currentIndex + 1]); 
+    } else {
+      // Fin de la lista
+      setIsPlaying(false);
+    }
+  };
+
+  // --- MEZCLAR FAVORITOS ---
+  const shuffleFavorites = () => {
+    if (favorites.length === 0) {
+      showToast("Agrega canciones a favoritos primero", "info");
+      return;
+    }
+    const shuffled = [...favorites].sort(() => Math.random() - 0.5);
+    // Reproducimos la primera y seteamos la cola mezclada
+    onSelectSong(shuffled[0], shuffled);
   };
 
   const toggleFavorite = async (song: Song) => {
@@ -514,7 +539,8 @@ export default function App() {
         src={playbackUrl} 
         onTimeUpdate={() => audioRef.current && setCurrentTime(audioRef.current.currentTime)}
         onLoadedMetadata={() => audioRef.current && setCurrentSong(s => ({ ...s, duration: audioRef.current?.duration || 0 }))}
-        onEnded={() => setIsPlaying(false)}
+        // AHORA LLAMA A LA LÓGICA DE SIGUIENTE CANCIÓN
+        onEnded={handleSongEnd}
       />
 
       {selectedPlaylist && (
@@ -578,7 +604,7 @@ export default function App() {
             <h2 className="text-2xl font-black mb-6 px-1 tracking-tighter">Tu actividad reciente</h2>
             <div className="flex gap-4 overflow-x-auto hide-scrollbar pb-8 px-1">
               {history.length > 0 ? history.map(s => (
-                <div key={s.id} onClick={() => onSelectSong(s)} className="min-w-[160px] group cursor-pointer">
+                <div key={s.id} onClick={() => onSelectSong(s, history)} className="min-w-[160px] group cursor-pointer">
                   <div className="relative aspect-square mb-3 overflow-hidden rounded-[24px] shadow-2xl">
                     <img src={s.coverUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                     {currentSong.id === s.id && isPlaying && <div className="absolute inset-0 bg-black/40 flex items-center justify-center backdrop-blur-sm"><MusicEqualizer /></div>}
@@ -612,16 +638,30 @@ export default function App() {
               </>
             ) : (
               <div className="animate-in slide-in-from-right duration-300">
-                <button onClick={() => setLibrarySubView('main')} className="flex items-center gap-2 text-zinc-400 mb-8"><ArrowLeft size={20}/> Volver</button>
+                <div className="flex items-center justify-between mb-8">
+                   <button onClick={() => setLibrarySubView('main')} className="flex items-center gap-2 text-zinc-400"><ArrowLeft size={20}/> Volver</button>
+                   {/* BOTÓN ALEATORIO AGREGADO */}
+                   <button 
+                     onClick={shuffleFavorites}
+                     className="bg-purple-600/20 text-purple-400 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2 border border-purple-500/20 hover:bg-purple-600 hover:text-white transition-all"
+                   >
+                     <Shuffle size={14} /> Aleatorio
+                   </button>
+                </div>
+
                 <h1 className="text-4xl font-black mb-8 tracking-tighter">Me gusta</h1>
-                <div className="flex flex-col gap-4">
-                  {favorites.map(f => (
-                    <div key={f.id} onClick={() => onSelectSong(f)} className="flex items-center gap-4 p-2 rounded-2xl hover:bg-white/5 cursor-pointer">
+                <div className="flex flex-col gap-4 pb-32">
+                  {favorites.length === 0 ? (
+                    <div className="text-zinc-500 text-center py-20">Aún no tienes canciones favoritas</div>
+                  ) : favorites.map(f => (
+                    // Al hacer click, pasamos 'favorites' como contexto para que siga reproduciendo la lista
+                    <div key={f.id} onClick={() => onSelectSong(f, favorites)} className={`flex items-center gap-4 p-2 rounded-2xl ${currentSong.id === f.id ? 'bg-purple-600/10' : 'hover:bg-white/5'} cursor-pointer`}>
                       <img src={f.coverUrl} className="w-14 h-14 rounded-xl object-cover" />
                       <div className="flex-1 overflow-hidden">
                         <h3 className="font-bold truncate text-sm">{f.title}</h3>
                         <p className="text-[10px] text-zinc-500 font-bold uppercase">{f.artist}</p>
                       </div>
+                      {currentSong.id === f.id && isPlaying && <MusicEqualizer />}
                       <Heart size={18} fill="#a855f7" className="text-purple-500" />
                     </div>
                   ))}
@@ -695,7 +735,6 @@ export default function App() {
           </div>
         )}
 
-        {/* --- CORRECCIÓN AQUÍ: Mini Reproductor Flotante --- */}
         {!isFullPlayerOpen && currentSong.id !== 'current' && (
           <div 
             onClick={() => setIsFullPlayerOpen(true)} 
@@ -787,19 +826,18 @@ export default function App() {
   );
 }
 
-// BUSQUEDA PREDICTIVA (MEJORADA)
-const SearchView: React.FC<{ onSelectSong: (s: Song) => void; currentSong: Song; isPlaying: boolean; showToast: (msg: string, type: 'success' | 'error' | 'info') => void; onSelectGenre: (p: Playlist) => void; }> = ({ onSelectSong, currentSong, isPlaying, showToast, onSelectGenre }) => {
+// BUSQUEDA PREDICTIVA (MEJORADA) - AHORA USA LA COLA
+const SearchView: React.FC<{ onSelectSong: (s: Song, context?: Song[]) => void; currentSong: Song; isPlaying: boolean; showToast: (msg: string, type: 'success' | 'error' | 'info') => void; onSelectGenre: (p: Playlist) => void; }> = ({ onSelectSong, currentSong, isPlaying, showToast, onSelectGenre }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Song[]>([]);
   const [loading, setLoading] = useState(false);
-  const [suggestions, setSuggestions] = useState<string[]>([]); // Estado para sugerencias
+  const [suggestions, setSuggestions] = useState<string[]>([]);
 
-  // Efecto para filtrar sugerencias mientras escribes
   useEffect(() => {
     if (query.trim().length > 1) {
       const matches = POPULAR_ARTISTS.filter(artist => 
         artist.toLowerCase().includes(query.toLowerCase())
-      ).slice(0, 5); // Max 5 sugerencias
+      ).slice(0, 5); 
       setSuggestions(matches);
     } else {
       setSuggestions([]);
@@ -841,7 +879,6 @@ const SearchView: React.FC<{ onSelectSong: (s: Song) => void; currentSong: Song;
           placeholder="Artistas o canciones" 
           className="w-full bg-white/10 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-purple-600 transition-all placeholder:text-zinc-600" 
         />
-        {/* LISTA DE SUGERENCIAS PREDICTIVAS */}
         {suggestions.length > 0 && (
           <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl z-50">
             {suggestions.map((suggestion, idx) => (
@@ -862,7 +899,7 @@ const SearchView: React.FC<{ onSelectSong: (s: Song) => void; currentSong: Song;
         results.length > 0 ? (
           <div className="flex flex-col gap-3">
             {results.map(s => (
-              <div key={s.id} onClick={() => onSelectSong(s)} className={`flex items-center gap-4 p-2 rounded-2xl ${currentSong.id === s.id ? 'bg-purple-600/10' : 'hover:bg-white/5'}`}>
+              <div key={s.id} onClick={() => onSelectSong(s, results)} className={`flex items-center gap-4 p-2 rounded-2xl ${currentSong.id === s.id ? 'bg-purple-600/10' : 'hover:bg-white/5'}`}>
                 <img src={s.coverUrl} className="w-14 h-14 rounded-xl object-cover" />
                 <div className="flex-1 overflow-hidden">
                   <p className="font-bold truncate text-sm">{s.title}</p>

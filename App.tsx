@@ -30,7 +30,7 @@ import {
   Mic,
   Share2,
   TrendingUp,
-  X // Importado para cerrar el modal
+  X 
 } from 'lucide-react';
 import OpenAI from 'openai';
 import { View, Song, Playlist } from './types';
@@ -79,7 +79,7 @@ const cleanAiResponse = (text: string) => {
   }
 };
 
-// CACHÉ INTELIGENTE: Guarda respuestas por 1 hora para velocidad instantánea
+// CACHÉ INTELIGENTE
 const getCachedData = (key: string) => {
   const cached = localStorage.getItem(key);
   if (!cached) return null;
@@ -177,7 +177,7 @@ const PlaylistDetail: React.FC<{
       // 1. Intentar cargar de caché primero
       const cached = getCachedData(cacheKey);
       if (cached) {
-        setSongs(cached); // Si existe, mostramos de inmediato (Instantáneo)
+        setSongs(cached);
         setLoading(false);
         return; 
       }
@@ -226,7 +226,7 @@ const PlaylistDetail: React.FC<{
         
         const finalSongs = resolvedSongs.filter((s): s is Song => s !== null);
         setSongs(finalSongs);
-        setCachedData(cacheKey, finalSongs); // Guardamos en caché para la próxima
+        setCachedData(cacheKey, finalSongs);
       } catch (e) {
         console.error(e);
       } finally {
@@ -238,7 +238,6 @@ const PlaylistDetail: React.FC<{
 
   return (
     <div className="absolute inset-0 bg-black/90 z-[70] flex flex-col animate-in slide-in-from-right duration-500 overflow-y-auto hide-scrollbar">
-      {/* ... (Resto del componente igual) ... */}
       <div className="relative h-80 flex-shrink-0">
         <img src={playlist.imageUrl} className="w-full h-full object-cover blur-sm opacity-50" />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
@@ -321,15 +320,13 @@ export default function App() {
   const [musicNews, setMusicNews] = useState<any[]>([]);
   const [isNewsLoading, setIsNewsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [selectedNewsItem, setSelectedNewsItem] = useState<any | null>(null); // Nuevo estado para noticia expandida
+  const [selectedNewsItem, setSelectedNewsItem] = useState<any | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info') => {
     setToast({ message, type });
   }, []);
-
-  // --- LOGICA DE CACHÉ PARA TRENDS Y NOTICIAS ---
 
   const fetchMusicTrends = async () => {
     setIsAiLoading(true);
@@ -368,7 +365,7 @@ export default function App() {
       }));
       
       setAiPlaylists(trends);
-      setCachedData('trends_home', trends); // Guardar en caché
+      setCachedData('trends_home', trends);
     } catch (e) {
       console.warn("Error Trends:", e);
       setAiPlaylists([
@@ -410,7 +407,7 @@ export default function App() {
       const newsData = cleanAiResponse(content);
       
       setMusicNews(newsData);
-      setCachedData('music_news', newsData); // Guardar en caché
+      setCachedData('music_news', newsData);
     } catch (e) {
       console.warn("Error News:", e);
       setMusicNews([{ headline: "Error de conexión", summary: "No se pudieron cargar las noticias.", category: "Error", emoji: "⚠️" }]);
@@ -531,7 +528,6 @@ export default function App() {
         />
       )}
 
-      {/* --- MODAL DE NOTICIA EXPANDIDA (PROFUNDIDAD) --- */}
       {selectedNewsItem && (
         <div className="absolute inset-0 z-[200] bg-black/95 backdrop-blur-3xl flex flex-col animate-in slide-in-from-bottom duration-300">
           <div className="p-6 flex justify-end">
@@ -699,9 +695,12 @@ export default function App() {
           </div>
         )}
 
+        {/* --- CORRECCIÓN AQUÍ: Mini Reproductor Flotante --- */}
         {!isFullPlayerOpen && currentSong.id !== 'current' && (
-          <div onClick={() => setIsFullPlayerOpen(true)} className="mx-3 mb-24 bg-zinc-900/90 backdrop-blur-2xl rounded-2xl p-2.5 flex items-center justify-between border border-white/5 shadow-2xl animate-slide-up cursor-pointer">
-            {/* ... Mini Player igual ... */}
+          <div 
+            onClick={() => setIsFullPlayerOpen(true)} 
+            className="fixed bottom-24 left-2 right-2 z-50 bg-zinc-900/95 backdrop-blur-2xl rounded-2xl p-2.5 flex items-center justify-between border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] animate-slide-up cursor-pointer"
+          >
             <div className="flex items-center gap-3 overflow-hidden pl-1">
               <img src={currentSong.coverUrl} className="w-11 h-11 rounded-xl object-cover shadow-lg" />
               <div className="truncate">
@@ -737,7 +736,6 @@ export default function App() {
 
       {isFullPlayerOpen && (
         <div className="fixed inset-0 z-[100] bg-black flex flex-col animate-in slide-in-from-bottom duration-500">
-          {/* ... Full Player igual ... */}
           <div className="fixed inset-0 z-0">
              <img src={currentSong.coverUrl} className="w-full h-full object-cover blur-[100px] opacity-30 scale-150" />
           </div>

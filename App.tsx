@@ -30,9 +30,9 @@ import {
   TrendingUp,
   X,
   Plus,       
-  ListPlus,
-  FolderPlus, 
-  Trash2      
+  ListPlus,   
+  Trash2,
+  FolderPlus // Usado para el botón de añadir a lista
 } from 'lucide-react';
 import { View, Song, Playlist } from './types';
 import { GENRES, INITIAL_SONG } from './constants';
@@ -224,7 +224,6 @@ const PlaylistDetail: React.FC<{
   return (
     <div className="absolute inset-0 bg-black/90 z-[70] flex flex-col animate-in slide-in-from-right duration-500 overflow-y-auto hide-scrollbar">
       <div className="relative h-80 flex-shrink-0">
-        {/* Usamos la imagen calculada headerImage */}
         <img src={headerImage} className="w-full h-full object-cover blur-sm opacity-50" />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
         <button onClick={onBack} className="absolute top-12 left-6 w-10 h-10 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center border border-white/10"><ArrowLeft size={24} /></button>
@@ -304,7 +303,7 @@ export default function App() {
       id: `user-pl-${Date.now()}`,
       name: newPlaylistName,
       description: 'Mi lista',
-      imageUrl: ALBUM_COVERS[Math.floor(Math.random() * ALBUM_COVERS.length)], // Imagen inicial aleatoria
+      imageUrl: ALBUM_COVERS[Math.floor(Math.random() * ALBUM_COVERS.length)],
       type: 'playlist'
     };
     setUserPlaylists(prev => [...prev, newPl]);
@@ -348,7 +347,7 @@ export default function App() {
     return undefined;
   };
 
-  // --- 🔥 AÑADIR A PLAYLIST Y DESCARGAR ---
+  // --- 🔥 AÑADIR A PLAYLIST Y DESCARGAR (REPARADO) ---
   const addToPlaylist = async (playlistId: string) => {
     if (!currentSong) return;
     

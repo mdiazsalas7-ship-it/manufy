@@ -30,9 +30,10 @@ import {
   TrendingUp,
   X,
   Plus,       
-  ListPlus,   
+  ListPlus,
+  FolderPlus, 
   Trash2,
-  FolderPlus // Usado para el botón de añadir a lista
+  Smartphone // Icono para el botón de instalar
 } from 'lucide-react';
 import { View, Song, Playlist } from './types';
 import { GENRES, INITIAL_SONG } from './constants';
@@ -287,8 +288,37 @@ export default function App() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [librarySubView, setLibrarySubView] = useState<'main' | 'likes' | 'playlist'>('main');
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
+  
+  // --- ESTADO PARA INSTALACIÓN PWA ---
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallButton, setShowInstallButton] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    // CAPTURA DEL EVENTO DE INSTALACIÓN
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallButton(true);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) {
+      showToast("Instalación no disponible o ya instalada", "info");
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      showToast("Instalando...", "success");
+      setShowInstallButton(false);
+    }
+    setDeferredPrompt(null);
+  };
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info') => {
     setToast({ message, type });
@@ -296,7 +326,6 @@ export default function App() {
 
   const handleCloseToast = useCallback(() => { setToast(null); }, []);
 
-  // --- LOGICA PLAYLISTS ---
   const createPlaylist = () => {
     if (!newPlaylistName.trim()) return;
     const newPl: Playlist = {
@@ -347,7 +376,7 @@ export default function App() {
     return undefined;
   };
 
-  // --- 🔥 AÑADIR A PLAYLIST Y DESCARGAR (REPARADO) ---
+  // --- 🔥 AÑADIR A PLAYLIST Y DESCARGAR ---
   const addToPlaylist = async (playlistId: string) => {
     if (!currentSong) return;
     
@@ -571,7 +600,11 @@ export default function App() {
                 <img src={LOGO_URL} className="w-12 h-12 rounded-full border border-white/20 shadow-2xl" alt="Logo" />
                 <div><h1 className="text-4xl font-black tracking-tighter bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">Manufy</h1><span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Global Music Hub</span></div>
               </div>
-              <div className="flex gap-4 text-zinc-400"><Bell size={20}/><Settings size={20}/></div>
+              <div className="flex gap-4 text-zinc-400">
+                {/* BOTÓN INSTALAR APP (Solo aparece si el navegador lo permite) */}
+                {showInstallButton && <button onClick={handleInstallClick} className="animate-pulse text-purple-400"><Smartphone size={24}/></button>}
+                <Bell size={20}/><Settings size={20}/>
+              </div>
             </header>
             <div className="grid grid-cols-2 gap-3 mb-12">
               {aiPlaylists.slice(0, 4).map(p => (

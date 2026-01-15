@@ -30,9 +30,9 @@ import {
   TrendingUp,
   X,
   Plus,       
-  ListPlus,
-  FolderPlus, 
+  ListPlus,   
   Trash2,
+  FolderPlus, // Usado para el botón de añadir a lista
   Smartphone // Icono para el botón de instalar
 } from 'lucide-react';
 import { View, Song, Playlist } from './types';
@@ -362,7 +362,9 @@ export default function App() {
     if (song.audioUrl && song.audioUrl.startsWith('http')) return song.audioUrl; 
 
     try {
-      const query = encodeURIComponent(`${song.title} ${song.artist} audio`);
+      // --- MODIFICACIÓN AQUÍ: Pedimos "lyric video" para que sea más ligero ---
+      const query = encodeURIComponent(`${song.title} ${song.artist} lyric video`);
+      
       const res = await resilientFetch(`${BACKEND_URL}/buscar?q=${query}`);
       if (res.ok) {
         const data = await res.json();

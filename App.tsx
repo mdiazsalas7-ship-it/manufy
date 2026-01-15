@@ -29,9 +29,10 @@ import {
   Share2,
   TrendingUp,
   X,
-  Plus,       // Nuevo icono
-  ListPlus,   // Nuevo icono
-  Trash2      // Nuevo icono
+  Plus,       
+  ListPlus,
+  FolderPlus, 
+  Trash2      
 } from 'lucide-react';
 import { View, Song, Playlist } from './types';
 import { GENRES, INITIAL_SONG } from './constants';
@@ -172,6 +173,9 @@ const PlaylistDetail: React.FC<{
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Define la imagen de cabecera: si hay canciones de usuario, usa la primera. Si no, la por defecto.
+  const headerImage = userSongs && userSongs.length > 0 && userSongs[0].coverUrl ? userSongs[0].coverUrl : playlist.imageUrl;
+
   useEffect(() => {
     // 1. Si es lista de usuario, usamos las canciones pasadas por prop
     if (userSongs) {
@@ -220,7 +224,8 @@ const PlaylistDetail: React.FC<{
   return (
     <div className="absolute inset-0 bg-black/90 z-[70] flex flex-col animate-in slide-in-from-right duration-500 overflow-y-auto hide-scrollbar">
       <div className="relative h-80 flex-shrink-0">
-        <img src={playlist.imageUrl} className="w-full h-full object-cover blur-sm opacity-50" />
+        {/* Usamos la imagen calculada headerImage */}
+        <img src={headerImage} className="w-full h-full object-cover blur-sm opacity-50" />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
         <button onClick={onBack} className="absolute top-12 left-6 w-10 h-10 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center border border-white/10"><ArrowLeft size={24} /></button>
         {onDelete && (
@@ -299,7 +304,7 @@ export default function App() {
       id: `user-pl-${Date.now()}`,
       name: newPlaylistName,
       description: 'Mi lista',
-      imageUrl: ALBUM_COVERS[Math.floor(Math.random() * ALBUM_COVERS.length)],
+      imageUrl: ALBUM_COVERS[Math.floor(Math.random() * ALBUM_COVERS.length)], // Imagen inicial aleatoria
       type: 'playlist'
     };
     setUserPlaylists(prev => [...prev, newPl]);
@@ -317,19 +322,6 @@ export default function App() {
     setSelectedPlaylist(null);
     setLibrarySubView('main');
     showToast('Playlist eliminada', 'info');
-  };
-
-  const addToPlaylist = (playlistId: string) => {
-    setPlaylistSongs(prev => {
-      const current = prev[playlistId] || [];
-      if (current.some(s => s.id === currentSong.id)) {
-        showToast('Ya está en la lista', 'info');
-        return prev;
-      }
-      return { ...prev, [playlistId]: [...current, currentSong] };
-    });
-    setShowAddToPlaylist(false);
-    showToast('Agregada a playlist', 'success');
   };
 
   const resolveSongAudio = async (song: Song): Promise<string | undefined> => {
@@ -354,6 +346,40 @@ export default function App() {
       }
     } catch (e) {}
     return undefined;
+  };
+
+  // --- 🔥 AÑADIR A PLAYLIST Y DESCARGAR ---
+  const addToPlaylist = async (playlistId: string) => {
+    if (!currentSong) return;
+    
+    const targetPlaylist = userPlaylists.find(p => p.id === playlistId);
+    
+    // 1. Agregar a la lista visualmente
+    setPlaylistSongs(prev => {
+      const current = prev[playlistId] || [];
+      if (current.some(s => s.id === currentSong.id)) return prev; // Evitar duplicados
+      return { ...prev, [playlistId]: [...current, currentSong] };
+    });
+    
+    setShowAddToPlaylist(false);
+    showToast(`Descargando para "${targetPlaylist?.name}"...`, 'info');
+
+    // 2. Descargar realmente
+    const url = await resolveSongAudio(currentSong);
+    if (url) {
+      try {
+        const response = await fetch(url);
+        if (response.ok) {
+          const blob = await response.blob();
+          await saveAudioBlob(currentSong.id, blob);
+          showToast(`¡Guardada en "${targetPlaylist?.name}"! 💾`, 'success');
+        } else {
+          showToast("Error de red al descargar", 'error');
+        }
+      } catch (e) {
+        showToast("Error guardando audio", 'error');
+      }
+    }
   };
 
   const preloadNextSong = async (currentId: string, currentQueue: Song[]) => {
@@ -507,7 +533,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL AGREGAR A PLAYLIST */}
+      {/* MODAL AGREGAR A PLAYLIST (Con imagen dinámica) */}
       {showAddToPlaylist && (
         <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-6 animate-in fade-in duration-200">
           <div className="bg-zinc-900 rounded-3xl p-6 w-full max-w-sm border border-white/10 max-h-[80vh] overflow-y-auto">
@@ -522,12 +548,17 @@ export default function App() {
               </button>
               <div className="h-px bg-white/10 my-1"/>
               {userPlaylists.length === 0 && <p className="text-zinc-500 text-center py-4">No tienes playlists creadas</p>}
-              {userPlaylists.map(p => (
+              {userPlaylists.map(p => {
+                // --- LÓGICA DE IMAGEN DINÁMICA EN MODAL ---
+                const songsInThisPlaylist = playlistSongs[p.id] || [];
+                const playlistImage = songsInThisPlaylist.length > 0 && songsInThisPlaylist[0].coverUrl ? songsInThisPlaylist[0].coverUrl : p.imageUrl;
+                
+                return (
                 <button key={p.id} onClick={() => addToPlaylist(p.id)} className="flex items-center gap-3 p-3 hover:bg-white/5 rounded-xl">
-                  <img src={p.imageUrl} className="w-10 h-10 rounded-lg object-cover" />
+                  <img src={playlistImage} className="w-10 h-10 rounded-lg object-cover" />
                   <span className="font-bold truncate">{p.name}</span>
                 </button>
-              ))}
+              )})}
             </div>
           </div>
         </div>
@@ -582,12 +613,18 @@ export default function App() {
                     <div><h3 className="text-lg font-bold">Tus Me Gusta</h3><p className="text-xs text-zinc-400 font-bold uppercase">{favorites.length} Canciones</p></div>
                   </div>
 
-                  {userPlaylists.map(pl => (
+                  {/* --- LISTA DE PLAYLISTS CON IMAGEN DINÁMICA --- */}
+                  {userPlaylists.map(pl => {
+                    const songsInThisPlaylist = playlistSongs[pl.id] || [];
+                    // Usa la portada de la primera canción si existe, si no, la por defecto
+                    const playlistImage = songsInThisPlaylist.length > 0 && songsInThisPlaylist[0].coverUrl ? songsInThisPlaylist[0].coverUrl : pl.imageUrl;
+                    
+                    return (
                     <div key={pl.id} onClick={() => setSelectedPlaylist(pl)} className="bg-white/5 p-4 rounded-[24px] border border-white/5 flex items-center gap-4 cursor-pointer hover:bg-white/10 active:scale-95 transition-all">
-                      <img src={pl.imageUrl} className="w-14 h-14 rounded-xl object-cover" />
-                      <div><h3 className="text-lg font-bold">{pl.name}</h3><p className="text-xs text-zinc-400 font-bold uppercase">{playlistSongs[pl.id]?.length || 0} Canciones</p></div>
+                      <img src={playlistImage} className="w-14 h-14 rounded-xl object-cover" />
+                      <div><h3 className="text-lg font-bold">{pl.name}</h3><p className="text-xs text-zinc-400 font-bold uppercase">{songsInThisPlaylist.length || 0} Canciones</p></div>
                     </div>
-                  ))}
+                  )})}
                 </div>
               </>
             ) : librarySubView === 'likes' ? (
@@ -652,7 +689,7 @@ export default function App() {
                 
                 {/* BOTONES DE ACCIÓN: AÑADIR A LISTA Y LIKE */}
                 <div className="flex gap-4">
-                  <button onClick={() => setShowAddToPlaylist(true)} className="text-zinc-400 hover:text-white transition-colors"><ListPlus size={28}/></button>
+                  <button onClick={() => setShowAddToPlaylist(true)} className="text-zinc-400 hover:text-white transition-colors"><FolderPlus size={28}/></button>
                   <button onClick={() => toggleFavorite(currentSong)} className={favorites.some(f => f.id === currentSong.id) ? "text-purple-500" : "text-zinc-700"}><Heart fill={favorites.some(f => f.id === currentSong.id) ? "currentColor" : "none"} size={32}/></button>
                 </div>
               </div>

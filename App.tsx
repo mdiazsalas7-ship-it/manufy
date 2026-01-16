@@ -76,20 +76,21 @@ const GENRES_DATA = [
 const POPULAR_ARTISTS = [
   "Bad Bunny", "Taylor Swift", "The Weeknd", "Drake", "Peso Pluma", 
   "Karol G", "Feid", "Kendrick Lamar", "Ariana Grande", "Harry Styles",
-  "Shakira", "Rosalía", "Rauw Alejandro", "Myke Towers", "Eladio Carrión"
+  "Shakira", "Rosalía", "Rauw Alejandro", "Myke Towers", "Eladio Carrión",
+  "Duki", "Quevedo", "Anuel AA", "J Balvin", "Maluma", "Ozuna", "Mora"
 ];
 
 const ENV_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
 const AI_MODEL = "openai/gpt-4o-mini";
 
-// --- FUNCIÓN MANUAL DIRECTA IA ---
+// --- FUNCIÓN MANUAL DIRECTA IA (MEJORADA CON MÁS TEMPERATURA) ---
 async function callAI(messages: any[]) {
   if (!ENV_KEY) return null;
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: { "Authorization": `Bearer ${ENV_KEY}`, "Content-Type": "application/json", "HTTP-Referer": "https://stackblitz.com", "X-Title": "Manufy" },
-      body: JSON.stringify({ model: AI_MODEL, messages: messages, temperature: 0.7 })
+      body: JSON.stringify({ model: AI_MODEL, messages: messages, temperature: 0.9 }) // Subí a 0.9 para más variedad
     });
     if (!response.ok) return null;
     const data = await response.json();
@@ -160,7 +161,7 @@ const MusicEqualizer = () => (
   </div>
 );
 
-// --- VISTA DETALLE PLAYLIST (SOPORTA USUARIO Y AI) ---
+// --- VISTA DETALLE PLAYLIST (LÓGICA IA MEJORADA) ---
 const PlaylistDetail: React.FC<{ 
   playlist: Playlist; 
   onBack: () => void; 
@@ -185,21 +186,31 @@ const PlaylistDetail: React.FC<{
       return;
     }
 
-    // 2. Si es lista de IA, hacemos el fetch normal
+    // 2. Si es lista de IA, hacemos el fetch inteligente
     const fetchSongs = async () => {
       setLoading(true);
-      const cacheKey = `playlist_meta_v16_${playlist.name}`;
+      // Usamos una clave de caché que incluya un pequeño randomizador o tiempo si quisieras que expire más rápido
+      // Por ahora la dejamos fija para no gastar tokens, pero el prompt cambiará lo que guarda la próxima vez
+      const cacheKey = `playlist_meta_v18_${playlist.name}`;
       const cached = getCachedData(cacheKey);
       
       let metaSongs: any[] = [];
       if (cached) { setSongs(cached); setLoading(false); return; }
 
       metaSongs = FALLBACK_SONGS[playlist.name] || FALLBACK_SONGS['Global Top 50'] || [];
+      
       if (ENV_KEY) {
+        // 🔥 MAGIA AQUÍ: Elegimos un artista aleatorio de la lista para variar los resultados
+        const randomArtist = POPULAR_ARTISTS[Math.floor(Math.random() * POPULAR_ARTISTS.length)];
+        
         const aiResponse = await callAI([
-          { role: "system", content: "Eres un DJ experto. Responde SOLO un JSON array válido." },
-          { role: "user", content: `Genera 10 canciones TOP HITS REALES para la playlist: "${playlist.name}". Formato JSON: title, artist.` }
+          { role: "system", content: "Eres un DJ experto y variado. Responde SOLO un JSON array válido." },
+          { role: "user", content: `Genera 12 canciones para la playlist "${playlist.name}". 
+            IMPORTANTE: Que sean tendencias actuales pero INCLUYE AL MENOS 2 CANCIONES estilo "${randomArtist}".
+            NO REPITAS siempre las mismas canciones top 10. Mezcla hits masivos con virales nuevos.
+            Formato JSON: [{"title": "Nombre", "artist": "Artista"}].` }
         ]);
+        
         if (aiResponse) {
           const aiData = cleanAiResponse(aiResponse);
           if (aiData.length > 0) metaSongs = aiData;
@@ -362,9 +373,8 @@ export default function App() {
     if (song.audioUrl && song.audioUrl.startsWith('http')) return song.audioUrl; 
 
     try {
-      // --- MODIFICACIÓN AQUÍ: Pedimos "lyric video" para que sea más ligero ---
+      // --- BÚSQUEDA LIGERA: Pedimos "lyric video" ---
       const query = encodeURIComponent(`${song.title} ${song.artist} lyric video`);
-      
       const res = await resilientFetch(`${BACKEND_URL}/buscar?q=${query}`);
       if (res.ok) {
         const data = await res.json();

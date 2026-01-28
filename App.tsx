@@ -32,15 +32,16 @@ import {
   Plus,       
   ListPlus,   
   Trash2,
-  FolderPlus, // Usado para el botón de añadir a lista
-  Smartphone // Icono para el botón de instalar
+  FolderPlus,
+  Smartphone,
+  HardDrive
 } from 'lucide-react';
 import { View, Song, Playlist } from './types';
 import { GENRES, INITIAL_SONG } from './constants';
 import { saveAudioBlob, getAudioBlob, deleteAudioBlob } from './db';
 
-// --- CONFIGURACIÓN ---
-const BACKEND_URL = 'https://fibre-patricia-gif-producing.trycloudflare.com'.replace(/\/$/, '');
+// --- 🚀 CONEXIÓN CON TU SERVIDOR (LINK NUEVO) ---
+const BACKEND_URL = 'https://respective-brake-surrounded-jaguar.trycloudflare.com'.replace(/\/$/, '');
 const TUNNEL_HEADERS = { 'Cloudflare-Skip-Browser-Warning': 'true' };
 const LOGO_URL = 'https://i.postimg.cc/05wxzk5G/unnamed.jpg';
 const BACKGROUND_IMAGE = 'https://i.postimg.cc/P5k7rD2R/unnamed.jpg';
@@ -63,7 +64,6 @@ const STATIC_TRENDS: Playlist[] = [
   { id: 'st-4', name: 'Gym Motivation', description: 'Energía pura', imageUrl: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80', type: 'playlist' },
 ];
 
-// --- FOTOS DE GÉNEROS (Buscar) ---
 const GENRES_DATA = [
   { name: 'Urbano Latino', color: 'bg-purple-600', imageUrl: 'https://images.unsplash.com/photo-1598387993441-a364f854c3e1?w=800&q=80' },
   { name: 'Pop Internacional', color: 'bg-pink-600', imageUrl: 'https://images.unsplash.com/photo-1496337589254-7e19d01cec44?w=800&q=80' },
@@ -83,14 +83,14 @@ const POPULAR_ARTISTS = [
 const ENV_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
 const AI_MODEL = "openai/gpt-4o-mini";
 
-// --- FUNCIÓN MANUAL DIRECTA IA (MEJORADA CON MÁS TEMPERATURA) ---
+// --- IA MEJORADA ---
 async function callAI(messages: any[]) {
   if (!ENV_KEY) return null;
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: { "Authorization": `Bearer ${ENV_KEY}`, "Content-Type": "application/json", "HTTP-Referer": "https://stackblitz.com", "X-Title": "Manufy" },
-      body: JSON.stringify({ model: AI_MODEL, messages: messages, temperature: 0.9 }) // Subí a 0.9 para más variedad
+      body: JSON.stringify({ model: AI_MODEL, messages: messages, temperature: 0.9 }) 
     });
     if (!response.ok) return null;
     const data = await response.json();
@@ -98,16 +98,13 @@ async function callAI(messages: any[]) {
   } catch (e) { return null; }
 }
 
-// --- BUSCADOR DE PORTADAS REALES ---
 async function fetchAlbumCover(songTitle: string, artistName: string): Promise<string> {
   try {
     const query = encodeURIComponent(`${songTitle} ${artistName}`);
     const res = await fetch(`https://itunes.apple.com/search?term=${query}&media=music&entity=song&limit=1`);
     if (res.ok) {
       const data = await res.json();
-      if (data.results && data.results.length > 0) {
-        return data.results[0].artworkUrl100.replace('100x100bb', '600x600bb');
-      }
+      if (data.results && data.results.length > 0) return data.results[0].artworkUrl100.replace('100x100bb', '600x600bb');
     }
   } catch (e) {}
   return '';
@@ -161,7 +158,7 @@ const MusicEqualizer = () => (
   </div>
 );
 
-// --- VISTA DETALLE PLAYLIST (LÓGICA IA MEJORADA) ---
+// --- VISTA DETALLE PLAYLIST ---
 const PlaylistDetail: React.FC<{ 
   playlist: Playlist; 
   onBack: () => void; 
@@ -169,40 +166,27 @@ const PlaylistDetail: React.FC<{
   currentSong: Song;
   isPlaying: boolean;
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
-  userSongs?: Song[]; // Prop opcional para listas del usuario
-  onDelete?: () => void; // Prop para borrar lista
+  userSongs?: Song[]; 
+  onDelete?: () => void; 
 }> = ({ playlist, onBack, onSelectSong, currentSong, isPlaying, showToast, userSongs, onDelete }) => {
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Define la imagen de cabecera: si hay canciones de usuario, usa la primera. Si no, la por defecto.
   const headerImage = userSongs && userSongs.length > 0 && userSongs[0].coverUrl ? userSongs[0].coverUrl : playlist.imageUrl;
 
   useEffect(() => {
-    // 1. Si es lista de usuario, usamos las canciones pasadas por prop
-    if (userSongs) {
-      setSongs(userSongs);
-      setLoading(false);
-      return;
-    }
+    if (userSongs) { setSongs(userSongs); setLoading(false); return; }
 
-    // 2. Si es lista de IA, hacemos el fetch inteligente
     const fetchSongs = async () => {
       setLoading(true);
-      // Usamos una clave de caché que incluya un pequeño randomizador o tiempo si quisieras que expire más rápido
-      // Por ahora la dejamos fija para no gastar tokens, pero el prompt cambiará lo que guarda la próxima vez
       const cacheKey = `playlist_meta_v18_${playlist.name}`;
       const cached = getCachedData(cacheKey);
-      
       let metaSongs: any[] = [];
       if (cached) { setSongs(cached); setLoading(false); return; }
 
       metaSongs = FALLBACK_SONGS[playlist.name] || FALLBACK_SONGS['Global Top 50'] || [];
       
       if (ENV_KEY) {
-        // 🔥 MAGIA AQUÍ: Elegimos un artista aleatorio de la lista para variar los resultados
         const randomArtist = POPULAR_ARTISTS[Math.floor(Math.random() * POPULAR_ARTISTS.length)];
-        
         const aiResponse = await callAI([
           { role: "system", content: "Eres un DJ experto y variado. Responde SOLO un JSON array válido." },
           { role: "user", content: `Genera 12 canciones para la playlist "${playlist.name}". 
@@ -210,7 +194,6 @@ const PlaylistDetail: React.FC<{
             NO REPITAS siempre las mismas canciones top 10. Mezcla hits masivos con virales nuevos.
             Formato JSON: [{"title": "Nombre", "artist": "Artista"}].` }
         ]);
-        
         if (aiResponse) {
           const aiData = cleanAiResponse(aiResponse);
           if (aiData.length > 0) metaSongs = aiData;
@@ -221,11 +204,8 @@ const PlaylistDetail: React.FC<{
         let cover = '';
         if (s.title && s.artist) cover = await fetchAlbumCover(s.title, s.artist);
         if (!cover) cover = ALBUM_COVERS[i % ALBUM_COVERS.length];
-        return {
-          id: `pl-${playlist.id}-${i}-${s.title}`, title: s.title, artist: s.artist, coverUrl: cover, audioUrl: undefined, duration: 0
-        };
+        return { id: `pl-${playlist.id}-${i}-${s.title}`, title: s.title, artist: s.artist, coverUrl: cover, audioUrl: undefined, duration: 0 };
       }));
-
       setSongs(displaySongs);
       setCachedData(cacheKey, displaySongs);
       setLoading(false);
@@ -239,9 +219,7 @@ const PlaylistDetail: React.FC<{
         <img src={headerImage} className="w-full h-full object-cover blur-sm opacity-50" />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
         <button onClick={onBack} className="absolute top-12 left-6 w-10 h-10 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center border border-white/10"><ArrowLeft size={24} /></button>
-        {onDelete && (
-          <button onClick={onDelete} className="absolute top-12 right-6 w-10 h-10 bg-red-500/20 backdrop-blur-md rounded-full flex items-center justify-center border border-red-500/50 text-red-500"><Trash2 size={20} /></button>
-        )}
+        {onDelete && <button onClick={onDelete} className="absolute top-12 right-6 w-10 h-10 bg-red-500/20 backdrop-blur-md rounded-full flex items-center justify-center border border-red-500/50 text-red-500"><Trash2 size={20} /></button>}
         <div className="absolute bottom-6 left-6 right-6">
           <h1 className="text-4xl font-black tracking-tighter mb-2">{playlist.name}</h1>
           <p className="text-zinc-400 text-sm font-bold uppercase tracking-widest">{userSongs ? "Mi Playlist" : "Powered by AI"}</p>
@@ -286,28 +264,30 @@ export default function App() {
   const [history, setHistory] = useState<Song[]>([]);
   const [queue, setQueue] = useState<Song[]>([]);
   const [songLoading, setSongLoading] = useState(false);
-
-  // --- PLAYLISTS USUARIO ---
   const [userPlaylists, setUserPlaylists] = useState<Playlist[]>([]);
   const [playlistSongs, setPlaylistSongs] = useState<Record<string, Song[]>>({});
   const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
-
   const [aiPlaylists, setAiPlaylists] = useState<Playlist[]>(STATIC_TRENDS);
   const [playbackUrl, setPlaybackUrl] = useState<string | undefined>(undefined);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [librarySubView, setLibrarySubView] = useState<'main' | 'likes' | 'playlist'>('main');
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
   
-  // --- ESTADO PARA INSTALACIÓN PWA ---
+  // --- AJUSTES ---
+  const [showSettings, setShowSettings] = useState(false);
+  const [searchQuality, setSearchQuality] = useState<'low' | 'high'>('low');
+
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallButton, setShowInstallButton] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    // CAPTURA DEL EVENTO DE INSTALACIÓN
+    const savedQuality = localStorage.getItem('manufy_quality') as 'low' | 'high';
+    if (savedQuality) setSearchQuality(savedQuality);
+
     const handler = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -318,16 +298,10 @@ export default function App() {
   }, []);
 
   const handleInstallClick = async () => {
-    if (!deferredPrompt) {
-      showToast("Instalación no disponible o ya instalada", "info");
-      return;
-    }
+    if (!deferredPrompt) return;
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      showToast("Instalando...", "success");
-      setShowInstallButton(false);
-    }
+    if (outcome === 'accepted') setShowInstallButton(false);
     setDeferredPrompt(null);
   };
 
@@ -336,6 +310,26 @@ export default function App() {
   }, []);
 
   const handleCloseToast = useCallback(() => { setToast(null); }, []);
+
+  const toggleQuality = () => {
+    const newQuality = searchQuality === 'low' ? 'high' : 'low';
+    setSearchQuality(newQuality);
+    localStorage.setItem('manufy_quality', newQuality);
+    showToast(`Calidad: ${newQuality === 'high' ? 'Alta (Audio Oficial)' : 'Rápida (Ahorro Datos)'}`, 'info');
+  };
+
+  const clearHistory = () => {
+    setHistory([]);
+    showToast('Historial borrado', 'success');
+  };
+
+  const clearDownloads = async () => {
+    showToast('Liberando espacio...', 'info');
+    try {
+      for (const song of favorites) { await deleteAudioBlob(song.id); }
+      showToast('Espacio liberado', 'success');
+    } catch (e) { showToast('Error al liberar espacio', 'error'); }
+  };
 
   const createPlaylist = () => {
     if (!newPlaylistName.trim()) return;
@@ -373,8 +367,10 @@ export default function App() {
     if (song.audioUrl && song.audioUrl.startsWith('http')) return song.audioUrl; 
 
     try {
-      // --- BÚSQUEDA LIGERA: Pedimos "lyric video" ---
-      const query = encodeURIComponent(`${song.title} ${song.artist} lyric video`);
+      // --- BÚSQUEDA DINÁMICA ---
+      const qualityTerm = searchQuality === 'high' ? 'official audio' : 'lyric video';
+      const query = encodeURIComponent(`${song.title} ${song.artist} ${qualityTerm}`);
+      
       const res = await resilientFetch(`${BACKEND_URL}/buscar?q=${query}`);
       if (res.ok) {
         const data = await res.json();
@@ -388,23 +384,16 @@ export default function App() {
     return undefined;
   };
 
-  // --- 🔥 AÑADIR A PLAYLIST Y DESCARGAR ---
   const addToPlaylist = async (playlistId: string) => {
     if (!currentSong) return;
-    
     const targetPlaylist = userPlaylists.find(p => p.id === playlistId);
-    
-    // 1. Agregar a la lista visualmente
     setPlaylistSongs(prev => {
       const current = prev[playlistId] || [];
-      if (current.some(s => s.id === currentSong.id)) return prev; // Evitar duplicados
+      if (current.some(s => s.id === currentSong.id)) return prev;
       return { ...prev, [playlistId]: [...current, currentSong] };
     });
-    
     setShowAddToPlaylist(false);
     showToast(`Descargando para "${targetPlaylist?.name}"...`, 'info');
-
-    // 2. Descargar realmente
     const url = await resolveSongAudio(currentSong);
     if (url) {
       try {
@@ -413,12 +402,8 @@ export default function App() {
           const blob = await response.blob();
           await saveAudioBlob(currentSong.id, blob);
           showToast(`¡Guardada en "${targetPlaylist?.name}"! 💾`, 'success');
-        } else {
-          showToast("Error de red al descargar", 'error');
-        }
-      } catch (e) {
-        showToast("Error guardando audio", 'error');
-      }
+        } else { showToast("Error de red al descargar", 'error'); }
+      } catch (e) { showToast("Error guardando audio", 'error'); }
     }
   };
 
@@ -458,9 +443,8 @@ export default function App() {
   const playNext = useCallback((e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const currentIndex = queue.findIndex(s => s.id === currentSong.id);
-    if (currentIndex !== -1 && currentIndex < queue.length - 1) {
-      onSelectSong(queue[currentIndex + 1]);
-    } else if (queue.length > 0) { onSelectSong(queue[0]); }
+    if (currentIndex !== -1 && currentIndex < queue.length - 1) { onSelectSong(queue[currentIndex + 1]); }
+    else if (queue.length > 0) { onSelectSong(queue[0]); }
   }, [queue, currentSong.id]);
 
   const playPrevious = useCallback((e?: React.MouseEvent) => {
@@ -472,29 +456,21 @@ export default function App() {
 
   const handleSongEnd = () => { playNext(); };
 
-  const loadBackgroundData = async () => {
-    if (!ENV_KEY) return;
-    const cachedTrends = getCachedData('trends_home_v12');
-    if (!cachedTrends) {
-        setAiPlaylists(STATIC_TRENDS); 
-        setCachedData('trends_home_v12', STATIC_TRENDS);
-    } else {
-        setAiPlaylists(cachedTrends);
-    }
-  };
-
   useEffect(() => {
     const savedFavs = localStorage.getItem('manufy_favorites');
     if (savedFavs) setFavorites(JSON.parse(savedFavs));
-    
     const savedPlaylists = localStorage.getItem('manufy_user_playlists');
     if (savedPlaylists) setUserPlaylists(JSON.parse(savedPlaylists));
-    
     const savedSongs = localStorage.getItem('manufy_playlist_songs');
     if (savedSongs) setPlaylistSongs(JSON.parse(savedSongs));
-
     loadBackgroundData();
   }, []);
+
+  const loadBackgroundData = async () => {
+    if (!ENV_KEY) return;
+    const cachedTrends = getCachedData('trends_home_v12');
+    if (!cachedTrends) { setAiPlaylists(STATIC_TRENDS); setCachedData('trends_home_v12', STATIC_TRENDS); } else { setAiPlaylists(cachedTrends); }
+  };
 
   useEffect(() => { localStorage.setItem('manufy_favorites', JSON.stringify(favorites)); }, [favorites]);
   useEffect(() => { localStorage.setItem('manufy_user_playlists', JSON.stringify(userPlaylists)); }, [userPlaylists]);
@@ -540,65 +516,40 @@ export default function App() {
 
       <audio ref={audioRef} src={playbackUrl} onTimeUpdate={() => audioRef.current && setCurrentTime(audioRef.current.currentTime)} onLoadedMetadata={() => audioRef.current && setCurrentSong(s => ({ ...s, duration: audioRef.current?.duration || 0 }))} onEnded={handleSongEnd} />
 
-      {selectedPlaylist && (
-        <PlaylistDetail 
-          playlist={selectedPlaylist} 
-          onBack={() => { setSelectedPlaylist(null); setLibrarySubView('main'); }} 
-          onSelectSong={onSelectSong} 
-          currentSong={currentSong} 
-          isPlaying={isPlaying} 
-          showToast={showToast}
-          userSongs={selectedPlaylist.id.startsWith('user-pl') ? playlistSongs[selectedPlaylist.id] : undefined}
-          onDelete={selectedPlaylist.id.startsWith('user-pl') ? () => deletePlaylist(selectedPlaylist.id) : undefined}
-        />
-      )}
+      {selectedPlaylist && <PlaylistDetail playlist={selectedPlaylist} onBack={() => { setSelectedPlaylist(null); setLibrarySubView('main'); }} onSelectSong={onSelectSong} currentSong={currentSong} isPlaying={isPlaying} showToast={showToast} userSongs={selectedPlaylist.id.startsWith('user-pl') ? playlistSongs[selectedPlaylist.id] : undefined} onDelete={selectedPlaylist.id.startsWith('user-pl') ? () => deletePlaylist(selectedPlaylist.id) : undefined} />}
 
-      {/* MODAL CREAR PLAYLIST */}
-      {showCreatePlaylist && (
+      {/* MODAL AJUSTES (NUEVO) */}
+      {showSettings && (
         <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-6 animate-in fade-in duration-200">
           <div className="bg-zinc-900 rounded-3xl p-6 w-full max-w-sm border border-white/10">
-            <h3 className="text-xl font-bold mb-4">Nueva Playlist</h3>
-            <input 
-              autoFocus
-              value={newPlaylistName}
-              onChange={(e) => setNewPlaylistName(e.target.value)}
-              placeholder="Nombre de la lista"
-              className="w-full bg-white/10 rounded-xl p-3 mb-6 focus:outline-none focus:ring-2 focus:ring-purple-500"
-            />
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setShowCreatePlaylist(false)} className="px-4 py-2 text-zinc-400 font-bold">Cancelar</button>
-              <button onClick={createPlaylist} className="px-6 py-2 bg-purple-600 rounded-full font-bold">Crear</button>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold">Ajustes</h3>
+              <button onClick={() => setShowSettings(false)}><X size={24} className="text-zinc-400"/></button>
             </div>
+            <div className="mb-6">
+              <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest mb-3">Calidad de Búsqueda</p>
+              <button onClick={toggleQuality} className="w-full flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5">
+                <div className="flex items-center gap-3">
+                  {searchQuality === 'high' ? <Wifi size={20} className="text-purple-500"/> : <WifiOff size={20} className="text-green-500"/>}
+                  <div className="text-left"><p className="font-bold text-sm">{searchQuality === 'high' ? 'Alta Calidad' : 'Modo Rápido'}</p><p className="text-[10px] text-zinc-400">{searchQuality === 'high' ? 'Audio Oficial' : 'Lyric Video (Ahorro)'}</p></div>
+                </div>
+                <div className={`w-10 h-5 rounded-full relative transition-colors ${searchQuality === 'high' ? 'bg-purple-600' : 'bg-zinc-600'}`}><div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${searchQuality === 'high' ? 'left-6' : 'left-1'}`}/></div>
+              </button>
+            </div>
+            <div className="mb-6"><p className="text-xs text-zinc-500 font-bold uppercase tracking-widest mb-3">Almacenamiento</p><button onClick={clearDownloads} className="w-full flex items-center gap-3 p-4 bg-white/5 rounded-xl border border-white/5 text-red-400 hover:bg-white/10"><Trash2 size={20} /><span className="font-bold text-sm">Eliminar descargas</span></button></div>
+            <div><p className="text-xs text-zinc-500 font-bold uppercase tracking-widest mb-3">Privacidad</p><button onClick={clearHistory} className="w-full flex items-center gap-3 p-4 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10"><SearchX size={20} /><span className="font-bold text-sm">Borrar Historial</span></button></div>
           </div>
         </div>
       )}
 
-      {/* MODAL AGREGAR A PLAYLIST (Con imagen dinámica) */}
       {showAddToPlaylist && (
         <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-6 animate-in fade-in duration-200">
           <div className="bg-zinc-900 rounded-3xl p-6 w-full max-w-sm border border-white/10 max-h-[80vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-               <h3 className="text-xl font-bold">Agregar a...</h3>
-               <button onClick={() => setShowAddToPlaylist(false)}><X size={24} className="text-zinc-400"/></button>
-            </div>
+            <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold">Agregar a...</h3><button onClick={() => setShowAddToPlaylist(false)}><X size={24} className="text-zinc-400"/></button></div>
             <div className="flex flex-col gap-3">
-              <button onClick={() => { setShowAddToPlaylist(false); setShowCreatePlaylist(true); }} className="flex items-center gap-3 p-4 bg-white/5 rounded-xl hover:bg-white/10">
-                <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center"><Plus size={20}/></div>
-                <span className="font-bold">Nueva Playlist</span>
-              </button>
+              <button onClick={() => { setShowAddToPlaylist(false); setShowCreatePlaylist(true); }} className="flex items-center gap-3 p-4 bg-white/5 rounded-xl hover:bg-white/10"><div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center"><Plus size={20}/></div><span className="font-bold">Nueva Playlist</span></button>
               <div className="h-px bg-white/10 my-1"/>
-              {userPlaylists.length === 0 && <p className="text-zinc-500 text-center py-4">No tienes playlists creadas</p>}
-              {userPlaylists.map(p => {
-                // --- LÓGICA DE IMAGEN DINÁMICA EN MODAL ---
-                const songsInThisPlaylist = playlistSongs[p.id] || [];
-                const playlistImage = songsInThisPlaylist.length > 0 && songsInThisPlaylist[0].coverUrl ? songsInThisPlaylist[0].coverUrl : p.imageUrl;
-                
-                return (
-                <button key={p.id} onClick={() => addToPlaylist(p.id)} className="flex items-center gap-3 p-3 hover:bg-white/5 rounded-xl">
-                  <img src={playlistImage} className="w-10 h-10 rounded-lg object-cover" />
-                  <span className="font-bold truncate">{p.name}</span>
-                </button>
-              )})}
+              {userPlaylists.map(p => { const songsInThisPlaylist = playlistSongs[p.id] || []; const playlistImage = songsInThisPlaylist.length > 0 && songsInThisPlaylist[0].coverUrl ? songsInThisPlaylist[0].coverUrl : p.imageUrl; return (<button key={p.id} onClick={() => addToPlaylist(p.id)} className="flex items-center gap-3 p-3 hover:bg-white/5 rounded-xl"><img src={playlistImage} className="w-10 h-10 rounded-lg object-cover" /><span className="font-bold truncate">{p.name}</span></button>)})}
             </div>
           </div>
         </div>
@@ -613,28 +564,15 @@ export default function App() {
                 <div><h1 className="text-4xl font-black tracking-tighter bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">Manufy</h1><span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Global Music Hub</span></div>
               </div>
               <div className="flex gap-4 text-zinc-400">
-                {/* BOTÓN INSTALAR APP (Solo aparece si el navegador lo permite) */}
                 {showInstallButton && <button onClick={handleInstallClick} className="animate-pulse text-purple-400"><Smartphone size={24}/></button>}
-                <Bell size={20}/><Settings size={20}/>
+                <Bell size={20}/><Settings size={20} onClick={() => setShowSettings(true)} className="cursor-pointer hover:text-white transition-colors"/>
               </div>
             </header>
             <div className="grid grid-cols-2 gap-3 mb-12">
-              {aiPlaylists.slice(0, 4).map(p => (
-                  <div key={p.id} onClick={() => setSelectedPlaylist(p)} className="bg-white/5 backdrop-blur-md rounded-xl flex items-center gap-3 h-16 overflow-hidden border border-white/5 hover:bg-white/10 active:scale-95 transition-all cursor-pointer">
-                    <img src={p.imageUrl} className="h-full aspect-square object-cover" />
-                    <span className="text-[10px] font-black uppercase tracking-tighter leading-tight pr-2">{p.name}</span>
-                  </div>
-                ))}
+              {aiPlaylists.slice(0, 4).map(p => (<div key={p.id} onClick={() => setSelectedPlaylist(p)} className="bg-white/5 backdrop-blur-md rounded-xl flex items-center gap-3 h-16 overflow-hidden border border-white/5 hover:bg-white/10 active:scale-95 transition-all cursor-pointer"><img src={p.imageUrl} className="h-full aspect-square object-cover" /><span className="text-[10px] font-black uppercase tracking-tighter leading-tight pr-2">{p.name}</span></div>))}
             </div>
             <h2 className="text-2xl font-black mb-6 px-1 tracking-tighter">Tu actividad reciente</h2>
-            <div className="flex gap-4 overflow-x-auto hide-scrollbar pb-8 px-1">
-              {history.length > 0 ? history.map(s => (
-                <div key={s.id} onClick={() => onSelectSong(s, history)} className="min-w-[160px] group cursor-pointer">
-                  <div className="relative aspect-square mb-3 overflow-hidden rounded-[24px] shadow-2xl"><img src={s.coverUrl} className="w-full h-full object-cover" /></div>
-                  <h3 className="text-sm font-black truncate">{s.title}</h3>
-                </div>
-              )) : <div className="text-zinc-600 text-xs font-bold uppercase tracking-widest py-10 px-4 border-2 border-dashed border-white/5 rounded-3xl w-full text-center">Sin actividad reciente</div>}
-            </div>
+            <div className="flex gap-4 overflow-x-auto hide-scrollbar pb-8 px-1">{history.length > 0 ? history.map(s => (<div key={s.id} onClick={() => onSelectSong(s, history)} className="min-w-[160px] group cursor-pointer"><div className="relative aspect-square mb-3 overflow-hidden rounded-[24px] shadow-2xl"><img src={s.coverUrl} className="w-full h-full object-cover" /></div><h3 className="text-sm font-black truncate">{s.title}</h3></div>)) : <div className="text-zinc-600 text-xs font-bold uppercase tracking-widest py-10 px-4 border-2 border-dashed border-white/5 rounded-3xl w-full text-center">Sin actividad reciente</div>}</div>
           </div>
         )}
 
@@ -645,49 +583,17 @@ export default function App() {
             {librarySubView === 'main' ? (
               <>
                 <h1 className="text-4xl font-black mb-10 tracking-tighter">Tu Biblioteca</h1>
-                
-                <button onClick={() => setShowCreatePlaylist(true)} className="w-full bg-white/10 border border-white/5 p-4 rounded-2xl flex items-center gap-4 mb-8 hover:bg-white/20 active:scale-95 transition-all">
-                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-black"><Plus size={24}/></div>
-                  <span className="font-bold text-lg">Crear Playlist</span>
-                </button>
-
+                <button onClick={() => setShowCreatePlaylist(true)} className="w-full bg-white/10 border border-white/5 p-4 rounded-2xl flex items-center gap-4 mb-8 hover:bg-white/20 active:scale-95 transition-all"><div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-black"><Plus size={24}/></div><span className="font-bold text-lg">Crear Playlist</span></button>
                 <div className="flex flex-col gap-4 pb-32">
-                  <div onClick={() => setLibrarySubView('likes')} className="bg-gradient-to-br from-purple-900 to-black p-4 rounded-[24px] border border-white/10 flex items-center gap-4 cursor-pointer active:scale-95 transition-all">
-                    <div className="w-14 h-14 bg-purple-600 rounded-xl flex items-center justify-center shadow-lg"><Heart fill="white" size={24} /></div>
-                    <div><h3 className="text-lg font-bold">Tus Me Gusta</h3><p className="text-xs text-zinc-400 font-bold uppercase">{favorites.length} Canciones</p></div>
-                  </div>
-
-                  {/* --- LISTA DE PLAYLISTS CON IMAGEN DINÁMICA --- */}
-                  {userPlaylists.map(pl => {
-                    const songsInThisPlaylist = playlistSongs[pl.id] || [];
-                    // Usa la portada de la primera canción si existe, si no, la por defecto
-                    const playlistImage = songsInThisPlaylist.length > 0 && songsInThisPlaylist[0].coverUrl ? songsInThisPlaylist[0].coverUrl : pl.imageUrl;
-                    
-                    return (
-                    <div key={pl.id} onClick={() => setSelectedPlaylist(pl)} className="bg-white/5 p-4 rounded-[24px] border border-white/5 flex items-center gap-4 cursor-pointer hover:bg-white/10 active:scale-95 transition-all">
-                      <img src={playlistImage} className="w-14 h-14 rounded-xl object-cover" />
-                      <div><h3 className="text-lg font-bold">{pl.name}</h3><p className="text-xs text-zinc-400 font-bold uppercase">{songsInThisPlaylist.length || 0} Canciones</p></div>
-                    </div>
-                  )})}
+                  <div onClick={() => setLibrarySubView('likes')} className="bg-gradient-to-br from-purple-900 to-black p-4 rounded-[24px] border border-white/10 flex items-center gap-4 cursor-pointer active:scale-95 transition-all"><div className="w-14 h-14 bg-purple-600 rounded-xl flex items-center justify-center shadow-lg"><Heart fill="white" size={24} /></div><div><h3 className="text-lg font-bold">Tus Me Gusta</h3><p className="text-xs text-zinc-400 font-bold uppercase">{favorites.length} Canciones</p></div></div>
+                  {userPlaylists.map(pl => { const songsInThisPlaylist = playlistSongs[pl.id] || []; const playlistImage = songsInThisPlaylist.length > 0 && songsInThisPlaylist[0].coverUrl ? songsInThisPlaylist[0].coverUrl : pl.imageUrl; return (<div key={pl.id} onClick={() => setSelectedPlaylist(pl)} className="bg-white/5 p-4 rounded-[24px] border border-white/5 flex items-center gap-4 cursor-pointer hover:bg-white/10 active:scale-95 transition-all"><img src={playlistImage} className="w-14 h-14 rounded-xl object-cover" /><div><h3 className="text-lg font-bold">{pl.name}</h3><p className="text-xs text-zinc-400 font-bold uppercase">{songsInThisPlaylist.length || 0} Canciones</p></div></div>)})}
                 </div>
               </>
             ) : librarySubView === 'likes' ? (
               <div className="animate-in slide-in-from-right duration-300">
-                <div className="flex items-center justify-between mb-8">
-                   <button onClick={() => setLibrarySubView('main')} className="flex items-center gap-2 text-zinc-400"><ArrowLeft size={20}/> Volver</button>
-                   <button onClick={shuffleFavorites} className="bg-purple-600/20 text-purple-400 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2 border border-purple-500/20 hover:bg-purple-600 hover:text-white transition-all"><Shuffle size={14} /> Aleatorio</button>
-                </div>
+                <div className="flex items-center justify-between mb-8"><button onClick={() => setLibrarySubView('main')} className="flex items-center gap-2 text-zinc-400"><ArrowLeft size={20}/> Volver</button><button onClick={shuffleFavorites} className="bg-purple-600/20 text-purple-400 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2 border border-purple-500/20 hover:bg-purple-600 hover:text-white transition-all"><Shuffle size={14} /> Aleatorio</button></div>
                 <h1 className="text-4xl font-black mb-8 tracking-tighter">Me gusta</h1>
-                <div className="flex flex-col gap-4 pb-32">
-                  {favorites.length === 0 ? <div className="text-zinc-500 text-center py-20">Aún no tienes canciones favoritas</div> : favorites.map(f => (
-                    <div key={f.id} onClick={() => onSelectSong(f, favorites)} className={`flex items-center gap-4 p-2 rounded-2xl ${currentSong.id === f.id ? 'bg-purple-600/10' : 'hover:bg-white/5'} cursor-pointer`}>
-                      <img src={f.coverUrl} className="w-14 h-14 rounded-xl object-cover" />
-                      <div className="flex-1 overflow-hidden"><h3 className="font-bold truncate text-sm">{f.title}</h3><p className="text-[10px] text-zinc-500 font-bold uppercase">{f.artist}</p></div>
-                      {currentSong.id === f.id && isPlaying && <MusicEqualizer />}
-                      <Heart size={18} fill="#a855f7" className="text-purple-500" />
-                    </div>
-                  ))}
-                </div>
+                <div className="flex flex-col gap-4 pb-32">{favorites.length === 0 ? <div className="text-zinc-500 text-center py-20">Aún no tienes canciones favoritas</div> : favorites.map(f => (<div key={f.id} onClick={() => onSelectSong(f, favorites)} className={`flex items-center gap-4 p-2 rounded-2xl ${currentSong.id === f.id ? 'bg-purple-600/10' : 'hover:bg-white/5'} cursor-pointer`}><img src={f.coverUrl} className="w-14 h-14 rounded-xl object-cover" /><div className="flex-1 overflow-hidden"><h3 className="font-bold truncate text-sm">{f.title}</h3><p className="text-[10px] text-zinc-500 font-bold uppercase">{f.artist}</p></div>{currentSong.id === f.id && isPlaying && <MusicEqualizer />}<Heart size={18} fill="#a855f7" className="text-purple-500" /></div>))}</div>
               </div>
             ) : null}
           </div>
@@ -695,25 +601,13 @@ export default function App() {
 
         {!isFullPlayerOpen && currentSong.id !== 'current' && (
           <div onClick={() => setIsFullPlayerOpen(true)} className="fixed bottom-24 left-2 right-2 z-50 bg-zinc-900/95 backdrop-blur-2xl rounded-2xl p-2.5 flex items-center justify-between border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] animate-slide-up cursor-pointer">
-            <div className="flex items-center gap-3 overflow-hidden pl-1">
-              <img src={currentSong.coverUrl} className="w-11 h-11 rounded-xl object-cover shadow-lg" />
-              <div className="truncate"><p className="text-xs font-black truncate">{currentSong.title}</p><p className="text-[10px] text-zinc-500 font-bold uppercase truncate">{currentSong.artist}</p></div>
-            </div>
-            <div className="flex items-center gap-2 px-1">
-              <button onClick={(e) => { e.stopPropagation(); toggleFavorite(currentSong); }} className={favorites.some(f => f.id === currentSong.id) ? 'text-purple-500' : 'text-zinc-500'}><Heart size={20} fill={favorites.some(f => f.id === currentSong.id) ? "currentColor" : "none"} /></button>
-              {songLoading ? <Loader2 className="animate-spin text-white" size={24}/> : <button onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="w-9 h-9 bg-white text-black rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-all">{isPlaying ? <Pause size={18} fill="currentColor"/> : <Play size={18} fill="currentColor" className="ml-1"/>}</button>}
-              <button onClick={playNext} className="text-zinc-300 hover:text-white active:scale-90 transition-all"><SkipForward size={24} fill="currentColor" /></button>
-            </div>
+            <div className="flex items-center gap-3 overflow-hidden pl-1"><img src={currentSong.coverUrl} className="w-11 h-11 rounded-xl object-cover shadow-lg" /><div className="truncate"><p className="text-xs font-black truncate">{currentSong.title}</p><p className="text-[10px] text-zinc-500 font-bold uppercase truncate">{currentSong.artist}</p></div></div>
+            <div className="flex items-center gap-2 px-1"><button onClick={(e) => { e.stopPropagation(); toggleFavorite(currentSong); }} className={favorites.some(f => f.id === currentSong.id) ? 'text-purple-500' : 'text-zinc-500'}><Heart size={20} fill={favorites.some(f => f.id === currentSong.id) ? "currentColor" : "none"} /></button>{songLoading ? <Loader2 className="animate-spin text-white" size={24}/> : <button onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="w-9 h-9 bg-white text-black rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-all">{isPlaying ? <Pause size={18} fill="currentColor"/> : <Play size={18} fill="currentColor" className="ml-1"/>}</button>}<button onClick={playNext} className="text-zinc-300 hover:text-white active:scale-90 transition-all"><SkipForward size={24} fill="currentColor" /></button></div>
           </div>
         )}
 
         <nav className="fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-3xl border-t border-white/5 pb-8 pt-4 px-8 flex justify-between items-center z-[80]">
-          {[ { id: 'home', icon: HomeIcon, label: 'Inicio' }, { id: 'search', icon: SearchIcon, label: 'Buscar' }, { id: 'library', icon: LibraryIcon, label: 'Biblioteca' } ].map(item => (
-            <button key={item.id} onClick={() => { setActiveView(item.id as View); setSelectedPlaylist(null); }} className={`flex flex-col items-center gap-1 transition-all ${activeView === item.id ? 'text-white scale-110' : 'text-zinc-600'}`}>
-              <item.icon size={22} strokeWidth={activeView === item.id ? 3 : 2} />
-              <span className="text-[8px] font-black uppercase tracking-widest">{item.label}</span>
-            </button>
-          ))}
+          {[{ id: 'home', icon: HomeIcon, label: 'Inicio' }, { id: 'search', icon: SearchIcon, label: 'Buscar' }, { id: 'library', icon: LibraryIcon, label: 'Biblioteca' }].map(item => (<button key={item.id} onClick={() => { setActiveView(item.id as View); setSelectedPlaylist(null); }} className={`flex flex-col items-center gap-1 transition-all ${activeView === item.id ? 'text-white scale-110' : 'text-zinc-600'}`}><item.icon size={22} strokeWidth={activeView === item.id ? 3 : 2} /><span className="text-[8px] font-black uppercase tracking-widest">{item.label}</span></button>))}
         </nav>
       </div>
 
@@ -721,33 +615,15 @@ export default function App() {
         <div className="fixed inset-0 z-[100] bg-black flex flex-col animate-in slide-in-from-bottom duration-500">
           <div className="fixed inset-0 z-0"><img src={currentSong.coverUrl} className="w-full h-full object-cover blur-[100px] opacity-30 scale-150" /></div>
           <div className="relative z-10 flex flex-col h-full">
-            <header className="p-6 flex justify-between items-center">
-              <button onClick={() => setIsFullPlayerOpen(false)} className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center"><ChevronDown size={28}/></button>
-              <div className="text-center"><p className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Reproduciendo</p></div>
-              <button className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center"><MoreVertical size={20}/></button>
-            </header>
+            <header className="p-6 flex justify-between items-center"><button onClick={() => setIsFullPlayerOpen(false)} className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center"><ChevronDown size={28}/></button><div className="text-center"><p className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Reproduciendo</p></div><button className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center"><MoreVertical size={20}/></button></header>
             <div className="flex-1 flex flex-col items-center justify-center px-10">
               <img src={currentSong.coverUrl} className="w-full aspect-square rounded-[40px] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)] border border-white/5 mb-16" />
               <div className="w-full mb-10 flex items-center justify-between">
                 <div className="overflow-hidden"><h1 className="text-3xl font-black truncate mb-1">{currentSong.title}</h1><p className="text-lg text-zinc-500 font-bold truncate uppercase">{currentSong.artist}</p></div>
-                
-                {/* BOTONES DE ACCIÓN: AÑADIR A LISTA Y LIKE */}
-                <div className="flex gap-4">
-                  <button onClick={() => setShowAddToPlaylist(true)} className="text-zinc-400 hover:text-white transition-colors"><FolderPlus size={28}/></button>
-                  <button onClick={() => toggleFavorite(currentSong)} className={favorites.some(f => f.id === currentSong.id) ? "text-purple-500" : "text-zinc-700"}><Heart fill={favorites.some(f => f.id === currentSong.id) ? "currentColor" : "none"} size={32}/></button>
-                </div>
+                <div className="flex gap-4"><button onClick={() => setShowAddToPlaylist(true)} className="text-zinc-400 hover:text-white transition-colors"><FolderPlus size={28}/></button><button onClick={() => toggleFavorite(currentSong)} className={favorites.some(f => f.id === currentSong.id) ? "text-purple-500" : "text-zinc-700"}><Heart fill={favorites.some(f => f.id === currentSong.id) ? "currentColor" : "none"} size={32}/></button></div>
               </div>
-              <div className="w-full mb-12">
-                <div className="h-1 bg-white/10 rounded-full w-full mb-4 overflow-hidden"><div className="h-full bg-white transition-all duration-300" style={{ width: `${(currentTime/(currentSong.duration || 1))*100}%` }} /></div>
-                <div className="flex justify-between text-[10px] text-zinc-500 font-black"><span>{Math.floor(currentTime / 60)}:{Math.floor(currentTime % 60).toString().padStart(2, '0')}</span><span>{Math.floor(currentSong.duration / 60)}:{Math.floor(currentSong.duration % 60).toString().padStart(2, '0')}</span></div>
-              </div>
-              <div className="w-full flex justify-between items-center mb-10">
-                <Shuffle className="text-zinc-700" size={24} />
-                <SkipBack onClick={playPrevious} fill="white" size={40} className="cursor-pointer active:scale-90 transition-transform" />
-                {songLoading ? <Loader2 className="animate-spin text-white" size={48}/> : <button onClick={togglePlay} className="w-20 h-20 bg-white text-black rounded-full flex items-center justify-center shadow-2xl active:scale-90 transition-all">{isPlaying ? <Pause fill="currentColor" size={36} /> : <Play fill="currentColor" className="ml-1" size={36} />}</button>}
-                <SkipForward onClick={playNext} fill="white" size={40} className="cursor-pointer active:scale-90 transition-transform" />
-                <Repeat className="text-zinc-700" size={24} />
-              </div>
+              <div className="w-full mb-12"><div className="h-1 bg-white/10 rounded-full w-full mb-4 overflow-hidden"><div className="h-full bg-white transition-all duration-300" style={{ width: `${(currentTime/(currentSong.duration || 1))*100}%` }} /></div><div className="flex justify-between text-[10px] text-zinc-500 font-black"><span>{Math.floor(currentTime / 60)}:{Math.floor(currentTime % 60).toString().padStart(2, '0')}</span><span>{Math.floor(currentSong.duration / 60)}:{Math.floor(currentSong.duration % 60).toString().padStart(2, '0')}</span></div></div>
+              <div className="w-full flex justify-between items-center mb-10"><Shuffle className="text-zinc-700" size={24} /><SkipBack onClick={playPrevious} fill="white" size={40} className="cursor-pointer active:scale-90 transition-transform" />{songLoading ? <Loader2 className="animate-spin text-white" size={48}/> : <button onClick={togglePlay} className="w-20 h-20 bg-white text-black rounded-full flex items-center justify-center shadow-2xl active:scale-90 transition-all">{isPlaying ? <Pause fill="currentColor" size={36} /> : <Play fill="currentColor" className="ml-1" size={36} />}</button>}<SkipForward onClick={playNext} fill="white" size={40} className="cursor-pointer active:scale-90 transition-transform" /><Repeat className="text-zinc-700" size={24} /></div>
             </div>
           </div>
         </div>

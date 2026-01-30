@@ -41,7 +41,7 @@ import { GENRES, INITIAL_SONG } from './constants';
 import { saveAudioBlob, getAudioBlob, deleteAudioBlob } from './db';
 
 // --- 🚀 CONEXIÓN CON TU SERVIDOR (LINK NUEVO) ---
-const BACKEND_URL = 'https://respective-brake-surrounded-jaguar.trycloudflare.com'.replace(/\/$/, '');
+const BACKEND_URL = 'https://aluminum-directories-ultram-molecular.trycloudflare.com'.replace(/\/$/, '');
 const TUNNEL_HEADERS = { 'Cloudflare-Skip-Browser-Warning': 'true' };
 const LOGO_URL = 'https://i.postimg.cc/05wxzk5G/unnamed.jpg';
 const BACKGROUND_IMAGE = 'https://i.postimg.cc/P5k7rD2R/unnamed.jpg';

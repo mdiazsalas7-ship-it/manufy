@@ -3,7 +3,7 @@ import { Home, Search, Play, Pause, Music, Loader2, Heart, SkipForward } from 'l
 
 // --- CONFIGURACIÓN OFICIAL MANUFY ---
 const BACKEND_URL = 'https://manufyvezla.xyz';
-const TUNNEL_HEADERS = { 'Cloudflare-Skip-Browser-Warning': 'true' };
+const TUNNEL_HEADERS = {};
 
 export default function App() {
   const [view, setView] = useState('home');

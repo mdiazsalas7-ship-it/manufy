@@ -1,66 +1,77 @@
-import React, { useState } from 'react';
-import ReactPlayer from 'react-player'; // Usamos la importación general que sí te funcionó
-import { Home, Search, Play, Pause, Loader2 } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Search, Play, Pause, Loader2, Send } from 'lucide-react';
 
 const BACKEND_URL = 'https://manufyvezla.xyz';
 
 export default function App() {
   const [view, setView] = useState('home');
   const [current, setCurrent] = useState({ 
-    id: '', 
-    title: 'Manufy Music', 
-    artist: 'Selecciona una canción', 
-    foto: 'https://i.imgur.com/Q61eP9C.png' 
+    id: '', title: 'Manufy TG', artist: 'Selecciona canción', foto: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Telegram_logo.svg/2048px-Telegram_logo.svg.png', audioUrl: '' 
   });
   const [isPlaying, setIsPlaying] = useState(false);
+  const [loading, setLoading] = useState(false); 
+  const [buffering, setBuffering] = useState(false); 
   const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState('');
-  const [videoUrl, setVideoUrl] = useState('');
+  
+  const audioRef = useRef(null);
 
   const playSong = (song) => {
     setCurrent(song);
-    // Cargamos el video oficial de YouTube
-    setVideoUrl(`https://www.youtube.com/watch?v=${song.id}`);
-    setIsPlaying(true);
+    setIsPlaying(false);
+    setBuffering(true);
+    
+    if (audioRef.current) {
+      audioRef.current.src = song.audioUrl;
+      audioRef.current.load();
+      audioRef.current.play()
+        .then(() => { setIsPlaying(true); setBuffering(false); })
+        .catch(e => { console.error(e); setBuffering(false); });
+    }
   };
 
   const handleSearch = async (e) => {
     e.preventDefault();
     if (!query.trim()) return;
     setLoading(true);
+    setResults([]); 
     try {
       const res = await fetch(`${BACKEND_URL}/buscar?q=${encodeURIComponent(query)}`);
       const data = await res.json();
       setResults(data);
-    } catch (err) { console.error(err); } finally { setLoading(false); }
+    } catch (err) { alert("Error conectando al servidor"); } finally { setLoading(false); }
   };
 
   return (
     <div className="h-screen bg-black text-white font-sans overflow-hidden flex flex-col">
+      <audio 
+        ref={audioRef} 
+        onEnded={() => setIsPlaying(false)} 
+        onWaiting={() => setBuffering(true)}
+        onPlaying={() => setBuffering(false)}
+      />
+
       <div className="flex-1 overflow-y-auto p-6 pb-48">
         {view === 'home' ? (
-          <div className="mt-12 animate-in fade-in slide-in-from-top-4 duration-700">
-            <h1 className="text-7xl font-black italic mb-2 tracking-tighter text-transparent bg-clip-text bg-gradient-to-br from-purple-400 via-pink-500 to-red-500">MANUFY</h1>
-            <p className="text-zinc-500 italic text-lg ml-1">Modo: Player Oficial.</p>
-            <div className="mt-16"><div className="p-6 bg-zinc-900/60 rounded-3xl border border-white/5"><h2 className="font-bold text-xl mb-1">Listo para sonar 🏀</h2><button onClick={() => setView('search')} className="mt-4 bg-white text-black px-6 py-2 rounded-full font-bold hover:scale-105 transition-transform">Buscar Música</button></div></div>
+          <div className="mt-12 text-center animate-in fade-in zoom-in duration-500">
+            <h1 className="text-6xl font-black text-blue-500 mb-2">MANUFY</h1>
+            <p className="text-zinc-400 mb-8">Base de Datos: Telegram</p>
+            <button onClick={() => setView('search')} className="bg-blue-600 px-8 py-3 rounded-full font-bold hover:scale-105 transition-transform">BUSCAR AHORA</button>
           </div>
         ) : (
           <div>
-            <form onSubmit={handleSearch} className="mb-8 sticky top-0 bg-black/80 backdrop-blur-md py-4 z-50">
-              <div className="relative">
-                <input autoFocus value={query} onChange={e => setQuery(e.target.value)} className="w-full bg-zinc-900 p-4 pl-12 rounded-2xl outline-none border border-zinc-800 focus:border-purple-500 text-lg text-white" placeholder="Buscar..." />
-                <Search className="absolute left-4 top-5 text-zinc-500" size={20} />
-              </div>
+            <form onSubmit={handleSearch} className="mb-4 sticky top-0 bg-black z-50 py-2">
+              <input autoFocus value={query} onChange={e => setQuery(e.target.value)} className="w-full bg-zinc-900 p-4 rounded-xl text-white outline-none border border-zinc-800 focus:border-blue-500" placeholder="Ej: Feid Luna" />
             </form>
-            {loading && <div className="text-center mt-10"><Loader2 className="animate-spin inline text-purple-500"/></div>}
-            <div className="grid gap-3">
+            {loading && <div className="text-center mt-10"><Loader2 className="animate-spin inline text-blue-500"/></div>}
+            
+            <div className="grid gap-2">
               {results.map((s) => (
-                <div key={s.id} onClick={() => playSong(s)} className="flex items-center gap-4 bg-zinc-900/40 p-3 rounded-2xl cursor-pointer hover:bg-zinc-800 transition-all active:scale-95">
-                  <img src={s.foto} className="w-14 h-14 rounded-lg object-cover" />
-                  <div className="flex-1 min-w-0">
-                    <p className={`font-bold truncate ${current.id === s.id ? 'text-purple-400' : 'text-white'}`}>{s.title}</p>
-                    <p className="text-xs text-zinc-500 truncate">{s.artist}</p>
+                <div key={s.id} onClick={() => playSong(s)} className="flex items-center gap-3 bg-zinc-900/60 p-3 rounded-xl cursor-pointer hover:bg-zinc-800 border border-transparent hover:border-blue-500/30 transition-all">
+                  <img src={s.foto} className="w-12 h-12 rounded-md object-cover" />
+                  <div className="min-w-0">
+                    <p className={`font-bold truncate text-sm ${current.id === s.id ? 'text-blue-400' : 'text-white'}`}>{s.title}</p>
+                    <p className="text-xs text-zinc-400 truncate">{s.artist}</p>
                   </div>
                 </div>
               ))}
@@ -69,45 +80,18 @@ export default function App() {
         )}
       </div>
 
-      {/* BARRA DE REPRODUCCIÓN (AQUÍ ESTÁ EL TRUCO) */}
-      <div className="fixed bottom-24 left-4 right-4 bg-zinc-900/95 backdrop-blur-xl border border-white/10 p-3 rounded-2xl flex items-center justify-between shadow-2xl z-[100]">
-        <div className="flex items-center gap-3 overflow-hidden flex-1 mr-4">
-          
-          {/* EN LUGAR DE FOTO ESTÁTICA, PONEMOS EL VIDEO AQUÍ PEQUEÑITO */}
-          <div className="w-16 h-12 rounded-lg overflow-hidden relative bg-black shrink-0">
-            {videoUrl ? (
-              <ReactPlayer
-                url={videoUrl}
-                playing={isPlaying}
-                width="100%"
-                height="100%"
-                controls={false}
-                onError={(e) => console.log("Error Player:", e)}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-                config={{ youtube: { playerVars: { showinfo: 0, controls: 0 } } }}
-              />
-            ) : (
-              <img src={current.foto} className="w-full h-full object-cover" />
-            )}
-          </div>
-
+      <div className="fixed bottom-0 w-full bg-zinc-900/95 backdrop-blur-lg p-4 pb-8 flex items-center justify-between border-t border-white/10 z-50">
+        <div className="flex items-center gap-3 overflow-hidden flex-1">
+          <img src={current.foto} className={`w-12 h-12 rounded-md bg-zinc-800 ${isPlaying ? 'animate-[spin_3s_linear_infinite]' : ''}`} />
           <div className="min-w-0">
-            <p className="text-sm font-bold truncate text-white">{current.title}</p>
-            <p className="text-[10px] text-zinc-400 uppercase font-bold truncate">{current.artist}</p>
+            <p className="font-bold text-sm truncate">{current.title}</p>
+            <p className="text-xs text-zinc-400 truncate">{current.artist}</p>
           </div>
         </div>
-        
-        {/* BOTÓN PLAY/PAUSA */}
-        <button onClick={() => setIsPlaying(!isPlaying)} className="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 active:scale-95 shadow-lg">
-          {isPlaying ? <Pause fill="black" size={20} /> : <Play fill="black" size={20} className="ml-0.5" />}
+        <button onClick={() => {if(audioRef.current) isPlaying ? audioRef.current.pause() : audioRef.current.play();}} className="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center ml-3 shadow-lg shadow-blue-500/20">
+            {buffering ? <Loader2 className="animate-spin" size={20} /> : (isPlaying ? <Pause size={20} fill="black" /> : <Play size={20} fill="black" className="ml-0.5" />)}
         </button>
       </div>
-
-      <nav className="fixed bottom-0 w-full bg-black border-t border-white/10 p-4 pb-6 flex justify-around items-center z-[101]">
-        <button onClick={() => setView('home')} className={view === 'home' ? 'text-white' : 'text-zinc-600'}><Home/></button>
-        <button onClick={() => setView('search')} className={view === 'search' ? 'text-white' : 'text-zinc-600'}><Search/></button>
-      </nav>
     </div>
   );
 }
